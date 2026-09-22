@@ -26,7 +26,8 @@
     "derive:strengths": "tsx scripts/derive-strengths.ts",
     "ingest:stage": "tsx scripts/ingest-stage.ts",
     "ingest:report": "tsx scripts/ingest-report.ts",
-    "ingest:check-logs": "tsx scripts/ingest-check-logs.ts"
+    "ingest:check-logs": "tsx scripts/ingest-check-logs.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
