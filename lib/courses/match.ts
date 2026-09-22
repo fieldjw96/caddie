@@ -65,9 +65,8 @@ const US_STATES: Record<string, string> = {
 };
 
 /**
- * The state a schedule Location names, or null for a country or anything unrecognised. A
- * Tournament with no state is not searched for: a name alone, across every course in the
- * country, is too easy to match to the wrong one.
+ * The state a schedule Location names, or null for a country. Search is filtered to the
+ * state, so a US course is only ever matched among the courses of its own state.
  */
 export function stateCode(location: string | null): string | null {
   if (location === null) return null;
@@ -196,8 +195,8 @@ export type Declared = {
 /**
  * Every declared pairing. Add one only after reading OpenGolfAPI's record and being sure it is
  * the course the Tournament is played on; for an event played over several courses, it is the
- * one the final round is played on. A club with two records that could each be it, such as
- * Quail Hollow's two in Charlotte, is left undeclared rather than picked from.
+ * one the final round is played on. A club whose record could be either of two courses, such
+ * as Detroit Golf Club's single record for its North and South, is left undeclared.
  */
 export const DECLARED_MATCHES: readonly Declared[] = [
   // Several courses listed: the one the final round is played on.
@@ -245,6 +244,15 @@ export const DECLARED_MATCHES: readonly Declared[] = [
     query: "tpc sawgrass",
     name: "Tpc Sawgrass The Players Stadium Course",
     state: "FL",
+  },
+  // Two records in Charlotte read as "Quail Hollow". This one is the Tour course by its own
+  // card: 7,635 yards at par 71, rated 77.3 with a slope of 148. The other, "Quail Hollow
+  // Golf Club", is 6,325 yards at par 70.
+  {
+    schedule: "Quail Hollow Club",
+    query: "quail hollow",
+    name: "Quail Hollow Country Club",
+    state: "NC",
   },
   {
     schedule: "Trump National Doral, (Blue Monster)",
@@ -298,41 +306,57 @@ function one(
 const collapse = (s: string) => s.trim().replace(/\s+/g, " ");
 
 /**
- * The one candidate `name` matches in `state`, and how certainly, or a near-miss saying why
- * not. Two courses reading the same is a near-miss, not a coin toss. `total` is how many
- * results search said it had, of which `candidates` is the page it returned.
+ * The one candidate `name` matches, and how certainly, or a near-miss saying why not.
+ *
+ * `state` is where the course must be: a US state, or null for a Tournament played abroad,
+ * whose course OpenGolfAPI records with no state. Every candidate that reads as `name` is
+ * counted wherever it is, and there must be exactly one, in the right place: two courses
+ * reading the same is a near-miss, not a coin toss, and so is the only one being elsewhere.
+ * `total` is how many results search said it had, of which `candidates` is the page returned.
  */
 export function matchCourse(
   name: string,
-  state: string,
+  state: string | null,
   candidates: Candidate[],
   total: number = candidates.length,
 ): MatchResult {
   const truncated = truncation(candidates, total);
   if (truncated) return truncated;
-  const inState = candidates.filter((c) => c.state === state);
+  const where = state ?? "no US state";
 
-  const exact = one(
-    inState.filter((c) => collapse(c.course_name) === collapse(name)),
-    "exact",
-    candidates,
-  );
-  if (exact) return exact;
-
-  const words = distinctiveWords(name).join(" ");
-  const normalised = one(
-    inState.filter((c) => distinctiveWords(c.course_name).join(" ") === words),
-    "normalised",
-    candidates,
-  );
-  if (normalised) return normalised;
+  const tiers: [CourseMatch, (c: Candidate) => boolean][] = [
+    ["exact", (c) => collapse(c.course_name) === collapse(name)],
+    [
+      "normalised",
+      (c) => distinctiveWords(c.course_name).join(" ") === distinctiveWords(name).join(" "),
+    ],
+  ];
+  for (const [confidence, reads] of tiers) {
+    const found = candidates.filter(reads);
+    const [only] = found;
+    if (found.length > 1) {
+      return {
+        status: "near-miss",
+        reason: `${found.length} courses read as this name, so none is chosen`,
+        candidates,
+      };
+    }
+    if (only && only.state !== state) {
+      return {
+        status: "near-miss",
+        reason: `the one course that reads as this name is in ${only.state ?? "no US state"}, not ${where}`,
+        candidates,
+      };
+    }
+    if (only) return { status: "matched", confidence, course: only };
+  }
 
   return {
     status: "near-miss",
     reason:
       candidates.length === 0
-        ? `search in ${state} returned nothing`
-        : `no course in ${state} reads as this name`,
+        ? `search in ${where} returned nothing`
+        : `no course in ${where} reads as this name`,
     candidates,
   };
 }

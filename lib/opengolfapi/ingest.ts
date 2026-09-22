@@ -123,7 +123,8 @@ const messageOf = (error: unknown) => (error instanceof Error ? error.message : 
 type Search = {
   /** Tried in order until one returns anything. */
   queries: string[];
-  state: string;
+  /** The state to filter search by, or null to search everywhere. */
+  state: string | null;
   match: (found: Candidate[], total: number) => MatchResult;
 };
 
@@ -152,10 +153,12 @@ function lookupFor(courseName: string, location: string | null): Search | { reas
         "Tournament is played on has not been declared",
     };
   }
-  const state = stateCode(location);
-  if (!state) {
-    return { reason: `its Location, ${location ?? "none"}, is not a US state to search within` };
+  if (location === null) {
+    return { reason: "the schedule gives no Location to search within" };
   }
+  // Abroad, search cannot be filtered by country, so it runs unfiltered and matchCourse
+  // accepts only a course with no US state that no other course anywhere reads the same as.
+  const state = stateCode(location);
   return {
     queries: searchQueries(host.club).slice(0, MAX_QUERIES),
     state,
@@ -212,7 +215,8 @@ export async function planCourses(
       try {
         let found: SearchResponse | null = null;
         for (const q of search.queries) {
-          const params = new URLSearchParams({ q, state: search.state });
+          const params = new URLSearchParams({ q });
+          if (search.state) params.set("state", search.state);
           found = await client.get(`/v1/courses/search?${params}`, searchResponse);
           attribution = found._attribution;
           if (found.courses.length > 0) break;
