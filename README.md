@@ -40,6 +40,13 @@ created. Idempotent, and about ten requests at one a second:
     npm run ingest:players
     npm run ingest:results
 
+Player Strengths, derived from the stored results into `player_strengths`: Skill, Form and a
+venue record at the next Tournament's Course, each with the sample it rests on, and null
+below five results. No network. Replaces every stored Strength, and reports how many Players
+ended up with nothing at all. `-- 2025-09-01` derives as of a named day instead of today:
+
+    npm run derive:strengths
+
 Checks, which are what CI runs:
 
     npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build
