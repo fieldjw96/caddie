@@ -1,6 +1,6 @@
 {
-  "id": "c65c8131-1823-4431-8fcd-90be5a85c7a9",
-  "prevId": "7ef04485-08cd-43d6-9ba4-a06b40ddfcf1",
+  "id": "f534b48d-b1f5-4898-a54a-69a8536befff",
+  "prevId": "c65c8131-1823-4431-8fcd-90be5a85c7a9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -631,6 +631,12 @@
           "type": "date",
           "primaryKey": false,
           "notNull": true
+        },
+        "course_name": {
+          "name": "course_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "course_id": {
           "name": "course_id",

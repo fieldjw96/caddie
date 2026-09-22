@@ -1,0 +1,86 @@
+{
+  "courses": [
+    {
+      "id": "68e050bf-b93a-4ad9-9782-88b3d567d439",
+      "name": "Bay Hills Recreation Park",
+      "course_name": "Bay Hills Recreation Park",
+      "latitude": 30.9943524,
+      "longitude": -92.1472946,
+      "state": "LA",
+      "city": "Bunkie",
+      "type": "Semi-Private/Resort",
+      "par": 36,
+      "phone": null,
+      "website": null
+    },
+    {
+      "id": "b6ec5b25-0164-41ea-815b-f8c31402a78a",
+      "name": "Bay Hills Golf Club",
+      "course_name": "Bay Hills Golf Club",
+      "latitude": 41.0474771,
+      "longitude": -95.9644954,
+      "state": "NE",
+      "city": "Plattsmouth",
+      "type": "Public",
+      "par": 72,
+      "phone": "402-298-8191",
+      "website": "http://www.bayhillsgolfclub.com"
+    },
+    {
+      "id": "13fae2ba-51cf-436d-93da-2faa8cecc2c9",
+      "name": "Bay Hill Club Lodge Championship Course",
+      "course_name": "Bay Hill Club Lodge Championship Course",
+      "latitude": 28.4583333,
+      "longitude": -81.5105556,
+      "state": "FL",
+      "city": "Orlando",
+      "type": "Resort/Private",
+      "par": 72,
+      "phone": "+14078762429",
+      "website": "http://www.bayhill.com/"
+    },
+    {
+      "id": "36dfedf1-036e-42ba-87ce-9d5140bbebe1",
+      "name": "Bay Hills Golf Club",
+      "course_name": "Bay Hills Golf Club",
+      "latitude": 39.0447078,
+      "longitude": -76.4765946,
+      "state": "MD",
+      "city": "Arnold",
+      "type": "semi-private",
+      "par": 70,
+      "phone": "(410) 928-4424",
+      "website": "http://www.bayhillsgc.com/"
+    },
+    {
+      "id": "1be50342-d35a-4342-b320-b39f4ee50f23",
+      "name": "Bay Hills Golf Club",
+      "course_name": "Bay Hills Golf Club",
+      "latitude": 39.0445694,
+      "longitude": -76.4672067,
+      "state": "MD",
+      "city": "Arnold",
+      "type": "semi-private",
+      "par": 70,
+      "phone": "(410) 928-4424",
+      "website": "http://www.bayhillsgc.com/"
+    },
+    {
+      "id": "567ff501-25d0-49da-9cca-2962c7fd174c",
+      "name": "Bay Hill Club Lodge Charger Course",
+      "course_name": "Bay Hill Club Lodge Charger Course",
+      "latitude": 28.4583333,
+      "longitude": -81.5105556,
+      "state": "FL",
+      "city": "Orlando",
+      "type": "Resort/Private",
+      "par": 36,
+      "phone": "+14078762429",
+      "website": "http://www.bayhill.com/"
+    }
+  ],
+  "total": 6,
+  "_license": "ODbL-1.0",
+  "_attribution": "\u00c2\u00a9 OpenStreetMap contributors (ODbL 1.0) via OpenGolfAPI \u00e2\u20ac\u201d https://opengolfapi.org/attribution",
+  "_upgrade": "Full detail (tees, climate, weather, nearby, booking) free at /api/v1/courses/{id}"
+}

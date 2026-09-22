@@ -19,8 +19,15 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1790048538481,
-      "tag": "0002_add_tournament_course_name",
+      "when": 1790048136528,
+      "tag": "0002_course_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790048743133,
+      "tag": "0003_add_tournament_course_name",
       "breakpoints": true
     }
   ]
