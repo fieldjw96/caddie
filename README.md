@@ -110,7 +110,7 @@ production.
 ## Is production working
 
 The checks below read the source tree, and they can all pass while the deployed site returns
-an error to every reader. On 2026-09-22 that is what happened. Two workflows address it:
+an error to every reader. On 2026-09-22 that is what happened. Three workflows address it:
 
 - `.github/workflows/smoke.yml` asks production itself. It runs after every Production
   deployment, every hour and by hand. It requires HTTP 200, a Tournament named in the page's
@@ -122,10 +122,15 @@ an error to every reader. On 2026-09-22 that is what happened. Two workflows add
 
       npm run smoke
 
-- `.github/workflows/migrate.yml` applies migrations to production on every push to `main`,
-  instead of waiting for the next daily ingest. It runs in the GitHub Environment
-  `production`, and its credential is that environment's secret, not a repository secret. It
-  needs a one-time setup:
+- `.github/workflows/deploy.yml` is the only automated path to production, described below.
+  Its last step is that same smoke check, so a deployment is checked the moment it is made
+  and the run that made it goes red if the site it just put live is broken.
+
+- `.github/workflows/migrate.yml` applies migrations to production by hand from the Actions
+  tab, and as the daily ingest's first job. It does not run on a push: `deploy.yml` migrates
+  as the step before it deploys, and a second trigger here would race it. It runs in the
+  GitHub Environment `production`, and its credential is that environment's secret, not a
+  repository secret. It needs a one-time setup:
 
       gh api -X PUT repos/fieldjw96/caddie/environments/production \
         -F 'deployment_branch_policy[protected_branches]=false' \
@@ -143,9 +148,45 @@ an error to every reader. On 2026-09-22 that is what happened. Two workflows add
   The daily ingest runs this same workflow as its first job, and its later stages wait for
   it, so the ingest never writes to a schema older than `main`.
 
-  Vercel builds the same push at the same time as this workflow runs. To make sure new code
-  never serves traffic before its migrations are applied, add "Apply migrations to
-  production" as a required check under Deployment Checks in the Vercel project's settings.
+## Deploying
+
+Merging to `main` migrates production and then deploys it, as steps of one job in
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). A failed step skips every step
+after it, so a failed migration means no deploy, and the deploy's own last step is the smoke
+check above, so a deployment that serves a 500 fails the run that made it. Why it is a
+workflow here rather than Vercel's Git integration is [ADR 0003](docs/adr/0003-deploying-is-one-ordered-sequence-run-from-actions.md).
+
+**Vercel must not also deploy.** `vercel.json` sets `git.deploymentEnabled` to `false`, which
+stops push builds, and **disconnecting the Git integration in the Vercel project's settings is
+a human step this repository cannot do or verify**. Until somebody does it, Vercel may still
+build a push and race the migration, which is the failure the workflow exists to end.
+
+It reads one secret and two identifiers, all of them on the `production` GitHub Environment
+rather than the repository, so only a job that names that environment, on `main`, can have
+them. None of them goes in a file: this repository is public.
+
+| Name                       | What                                                                    | Where it comes from                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `POSTGRES_URL_NON_POOLING` | Secret. The direct connection the migration applies DDL over.           | Supabase, as above. Already set for `migrate.yml`; the deploy reads the same one.                      |
+| `VERCEL_TOKEN`             | Secret. Lets the CLI deploy. Scope it to this project, not the account. | <https://vercel.com/account/tokens>                                                                    |
+| `VERCEL_ORG_ID`            | Variable, not a secret. Which account owns the project.                 | `orgId` in `.vercel/project.json` after running `vercel link` locally, or the project's settings page. |
+| `VERCEL_PROJECT_ID`        | Variable, not a secret. Which project to deploy.                        | `projectId` in the same file.                                                                          |
+
+The identifiers have to be given rather than discovered: a project-scoped token cannot read
+the account that owns it, so `vercel whoami` and `vercel link` both fail under one with "User
+not found". Setting all four:
+
+    gh secret set VERCEL_TOKEN --env production
+    gh variable set VERCEL_ORG_ID --env production --body team_xxxxxxxx
+    gh variable set VERCEL_PROJECT_ID --env production --body prj_xxxxxxxx
+    gh secret set POSTGRES_URL_NON_POOLING --env production
+
+Until they are all set, every merge fails at the workflow's preflight step, which names each
+missing one and the command above that sets it, having migrated nothing and deployed nothing.
+
+To redeploy, re-run the Deploy run for the current tip of `main`. The job refuses to deploy a
+commit `main` has moved past — it checks before it touches a secret and again before it
+deploys — because a re-run of an older run would ship old code behind the newer schema.
 
 ## Checks
 
