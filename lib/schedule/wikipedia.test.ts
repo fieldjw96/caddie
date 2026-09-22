@@ -125,6 +125,19 @@ describe("fetchIntro", () => {
     const [url] = fetchMock.mock.calls[0] as [URL];
     expect(url.searchParams.get("section")).toBe("0");
   });
+
+  it("throws a MissingArticleError, naming the page, when the article does not exist", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ error: { code: "missingtitle", info: "gone" } })),
+    );
+
+    const error = await callThrough(() => fetchIntro("Tpc Deere Run")).catch((e) => e);
+    expect(error).toBeInstanceOf(MissingArticleError);
+    expect(String(error)).toMatch(/Tpc Deere Run/);
+  });
 });
 
 describe("throttling", () => {
