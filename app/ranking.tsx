@@ -17,8 +17,8 @@ import {
   type FitCourseTraits,
   type FitTraitName,
   type Weightings,
-} from "@/lib/fit";
-import type { PlayerView, StrengthView } from "@/lib/page/data";
+} from "../lib/fit";
+import type { PlayerView, StrengthView } from "../lib/page/data";
 
 export const TRAIT_LABELS: Readonly<Record<FitTraitName, string>> = {
   length_yards: "Length",
@@ -99,20 +99,27 @@ export function Ranking({
     () => false,
   );
 
-  const ranked = useMemo(
-    () =>
-      rankFits(
-        players.map((player) => ({
-          player,
-          fit: fitScore(
-            traits,
-            { skill: player.skill?.value ?? null, form: player.form?.value ?? null },
-            deferred,
-          ),
-        })),
+  const ranked = useMemo(() => {
+    const { scored, unscored } = rankFits(
+      players.map((player) => ({
+        player,
+        fit: fitScore(
+          traits,
+          { skill: player.skill?.value ?? null, form: player.form?.value ?? null },
+          deferred,
+        ),
+      })),
+    );
+    // A score resting on none of the Weighting is a zero standing in for unknown: with every
+    // Trait a Player has the Strength for weighted at nothing, the sum is 0 but says nothing.
+    // It is shown with the Players who have no Fit Score, never ranked level with the field.
+    return {
+      scored: scored.filter((e) => e.fit.knownWeight > 0),
+      unscored: [...unscored, ...scored.filter((e) => e.fit.knownWeight === 0)].sort((a, b) =>
+        a.player.name.localeCompare(b.player.name, "en"),
       ),
-    [players, traits, deferred],
-  );
+    };
+  }, [players, traits, deferred]);
 
   const changed = FIT_TRAITS.some((t) => weightings[t] !== DEFAULT_WEIGHTINGS[t]);
   const totalWeight = FIT_TRAITS.reduce((sum, t) => sum + weightings[t], 0);
@@ -282,9 +289,10 @@ export function Ranking({
           Players with no usable record
         </h2>
         <p className="mt-2 max-w-prose text-sm text-muted">
-          {ranked.unscored.length} Players have no Fit Score, because none of their Strengths
-          rests on enough results to state. They are not ranked last: unknown is not bad, and
-          most of them simply played events no source we can publish from covers.
+          {ranked.unscored.length} Players have no Fit Score, because no Strength the current
+          Weightings call for rests on enough of their results to state. They are not ranked
+          last: unknown is not bad, and most of them simply played events no source we can
+          publish from covers.
         </p>
         {ranked.unscored.length > 0 && (
           <details

@@ -9,7 +9,7 @@ import {
   formatDates,
   holesUnavailableReason,
   type PageData,
-} from "@/lib/page/data";
+} from "../lib/page/data";
 import { Ranking } from "./ranking";
 
 export const LICENCES = {

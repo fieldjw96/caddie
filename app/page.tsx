@@ -1,4 +1,4 @@
-import { loadPageData } from "@/lib/page/load";
+import { loadPageData } from "../lib/page/load";
 import { PageView } from "./page-view";
 
 // Read at request time: which Tournament is next depends on today, and the build has no
