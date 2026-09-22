@@ -38,6 +38,13 @@ refuses any Trait built on hole yardages for a course whose `holes_trusted` is f
 
     npm run derive:course-traits
 
+Results, from Wikipedia into `results`, for the most recent season with final FedEx Cup
+standings. Needs `ingest:players` first: a name matching no player is reported, never
+created. Idempotent, and about ten requests at one a second:
+
+    npm run ingest:players
+    npm run ingest:results
+
 Checks, which are what CI runs:
 
     npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build

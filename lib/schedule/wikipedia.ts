@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 
-const USER_AGENT = "Caddie/0.1 (+https://github.com/fieldjw96/caddie) schedule-ingest";
+const USER_AGENT = "Caddie/0.1 (+https://github.com/fieldjw96/caddie) wikipedia-ingest";
 
 const API_ENDPOINT = "https://en.wikipedia.org/w/api.php";
 

@@ -39,7 +39,13 @@ const bodies: Record<string, () => Row> = {
     end_date: "2026-04-12",
     course_id: courseId,
   }),
-  results: () => ({ player_id: playerId, tournament_id: tournamentId, position: 1 }),
+  results: () => ({
+    player_id: playerId,
+    tournament_id: tournamentId,
+    position: 1,
+    basis: "standings",
+    finish: "1",
+  }),
   course_traits: () => ({
     course_id: courseId,
     trait: `length_${unique()}`,
