@@ -60,8 +60,9 @@ requests at one a second. `-- 2025` reads one named season:
     npm run ingest:results
 
 Player Strengths, derived from the stored results into `player_strengths`: Skill, Form and a
-venue record at the next Tournament's Course, each with the sample it rests on, and null
-below five results. No network. Replaces every stored Strength, and reports how many Players
+venue record at the next Tournament's Course from finishing positions, and Consistency and
+Low rounds from the full-field leaderboards' round scores, each with the sample it rests on,
+and null below five results. No network. Replaces every stored Strength, and reports how many Players
 ended up with nothing at all. `-- 2025-09-01` derives as of a named day instead of today:
 
     npm run derive:strengths
