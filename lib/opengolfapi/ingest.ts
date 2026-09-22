@@ -1,8 +1,8 @@
 // From a course's name to a `courses` row: resolve it, fetch it, check its holes, map it.
 // Nothing here touches the database, so all of it can be tested from fixtures.
 
-import type { CourseHole, CourseTee, courses } from "@/db/schema";
-import { OPENGOLFAPI_BASE_URL, type OpenGolfApiClient } from "./client";
+import type { CourseHole, CourseTee, courses } from "../../db/schema";
+import { OPENGOLFAPI_BASE_URL, RateLimitExhausted, type OpenGolfApiClient } from "./client";
 import { checkHoles } from "./holes";
 import { courseResponse, searchResponse, type CourseResponse } from "./schema";
 
@@ -114,12 +114,48 @@ export function toCourseRow(course: CourseResponse, attribution: string): Course
   };
 }
 
+export type Outcome =
+  { venue: Venue; ok: true; row: CourseRow } | { venue: Venue; ok: false; error: string };
+
+/**
+ * Fetches and stores each Venue in turn. A course that fails, whether by resolution, request
+ * or changed shape, becomes a failed Outcome and the run moves on to the next. The one
+ * exception is RateLimitExhausted, which is thrown: every later request would fail the same
+ * way, so going on would only spend the failures.
+ */
+export async function ingestVenues(
+  client: OpenGolfApiClient,
+  venues: Venue[],
+  store: (row: CourseRow) => Promise<void>,
+  report: (outcome: Outcome) => void = () => {},
+): Promise<Outcome[]> {
+  const outcomes: Outcome[] = [];
+  for (const venue of venues) {
+    let outcome: Outcome;
+    try {
+      const row = await fetchCourse(client, venue);
+      await store(row);
+      outcome = { venue, ok: true, row };
+    } catch (error) {
+      if (error instanceof RateLimitExhausted) throw error;
+      outcome = {
+        venue,
+        ok: false,
+        error: error instanceof Error ? error.message : `${error}`,
+      };
+    }
+    outcomes.push(outcome);
+    report(outcome);
+  }
+  return outcomes;
+}
+
 /** Resolves one Venue and fetches its full record: two requests. */
-export async function fetchCourse(client: OpenGolfApiClient, venue: Venue): Promise<CourseRow> {
+export async function fetchCourse(
+  client: OpenGolfApiClient,
+  venue: Venue,
+): Promise<CourseRow> {
   const { id, attribution } = await resolve(client, venue);
-  const course = await client.get(
-    `/api/v1/courses/${encodeURIComponent(id)}`,
-    courseResponse,
-  );
+  const course = await client.get(`/api/v1/courses/${encodeURIComponent(id)}`, courseResponse);
   return toCourseRow(course, attribution);
 }

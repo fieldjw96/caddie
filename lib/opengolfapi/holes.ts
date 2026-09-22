@@ -4,7 +4,11 @@
 // we have nothing to correct them with. It records whether they agree with the course's own
 // total, so that anything deriving a Trait from them can refuse to.
 
-import { HOLE_YARDAGE_TOLERANCE_PERCENT, type CourseHole, type CourseTee } from "@/db/schema";
+import {
+  HOLE_YARDAGE_TOLERANCE_PERCENT,
+  type CourseHole,
+  type CourseTee,
+} from "../../db/schema";
 
 export type HoleCheck = {
   /** The hole yardage key that was summed. */

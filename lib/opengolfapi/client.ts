@@ -25,7 +25,9 @@ export const MIN_REQUEST_INTERVAL_MS = 1_000;
  */
 export class RateLimitExhausted extends Error {
   constructor(detail: string) {
-    super(`OpenGolfAPI's daily limit of ${DAILY_REQUEST_LIMIT} requests is used up: ${detail}`);
+    super(
+      `OpenGolfAPI's daily limit of ${DAILY_REQUEST_LIMIT} requests is used up: ${detail}`,
+    );
     this.name = "RateLimitExhausted";
   }
 }

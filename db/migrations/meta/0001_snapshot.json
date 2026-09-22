@@ -93,12 +93,8 @@
           "name": "course_traits_course_id_courses_id_fk",
           "tableFrom": "course_traits",
           "tableTo": "courses",
-          "columnsFrom": [
-            "course_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["course_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -368,12 +364,8 @@
           "name": "player_strengths_player_id_players_id_fk",
           "tableFrom": "player_strengths",
           "tableTo": "players",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -564,12 +556,8 @@
           "name": "results_player_id_players_id_fk",
           "tableFrom": "results",
           "tableTo": "players",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -577,12 +565,8 @@
           "name": "results_tournament_id_tournaments_id_fk",
           "tableFrom": "results",
           "tableTo": "tournaments",
-          "columnsFrom": [
-            "tournament_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tournament_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -697,12 +681,8 @@
           "name": "tournaments_course_id_courses_id_fk",
           "tableFrom": "tournaments",
           "tableTo": "courses",
-          "columnsFrom": [
-            "course_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["course_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -727,12 +707,7 @@
     "public.source": {
       "name": "source",
       "schema": "public",
-      "values": [
-        "wikidata",
-        "wikipedia",
-        "opengolfapi",
-        "derived"
-      ]
+      "values": ["wikidata", "wikipedia", "opengolfapi", "derived"]
     }
   },
   "schemas": {},

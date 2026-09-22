@@ -8,12 +8,13 @@
 // reported and skipped; the run carries on, then exits non-zero so the failure is not missed.
 // Running out of daily requests ends the run, because every later request would fail too.
 
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { courses } from "../db/schema";
-import { OpenGolfApiClient, RateLimitExhausted } from "../lib/opengolfapi/client";
-import { fetchCourse, VENUES, type Venue } from "../lib/opengolfapi/ingest";
+import { OpenGolfApiClient } from "../lib/opengolfapi/client";
+import { ingestVenues, VENUES, type Outcome, type Venue } from "../lib/opengolfapi/ingest";
+import { storeCourse } from "../lib/opengolfapi/store";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -31,37 +32,34 @@ function selected(args: string[]): Venue[] {
   return VENUES.filter((v) => args.some((a) => is(v, a)));
 }
 
+function report(outcome: Outcome) {
+  if (!outcome.ok) {
+    console.error(`FAIL  ${outcome.venue.query}: ${outcome.error}`);
+    return;
+  }
+  const row = outcome.row;
+  const difference = row.holesYardageDifference ?? 0;
+  const verdict =
+    row.holesTrusted == null
+      ? "holes not checked"
+      : `holes_trusted=${row.holesTrusted}: ${row.holesCheckedTee} holes sum ` +
+        `${row.holesYardageSum} against ${row.publishedYardage} published ` +
+        `(${difference >= 0 ? "+" : ""}${difference})`;
+  console.log(`ok    ${outcome.venue.query} -> ${row.name}: ${verdict}`);
+}
+
 async function main() {
   const venues = selected(process.argv.slice(2));
   const client = postgres(url!, { max: 1, onnotice: () => {} });
   const db = drizzle(client);
   const api = new OpenGolfApiClient();
-  const failed: string[] = [];
 
   try {
-    for (const venue of venues) {
-      try {
-        const row = await fetchCourse(api, venue);
-        await db
-          .insert(courses)
-          .values(row)
-          .onConflictDoUpdate({
-            target: courses.openGolfApiId,
-            set: { ...row, recordedAt: sql`now()` },
-          });
-
-        const verdict =
-          row.holesTrusted === null || row.holesTrusted === undefined
-            ? "holes not checked"
-            : `holes_trusted=${row.holesTrusted}: ${row.holesCheckedTee} holes sum ` +
-              `${row.holesYardageSum} against ${row.publishedYardage} published ` +
-              `(${(row.holesYardageDifference ?? 0) >= 0 ? "+" : ""}${row.holesYardageDifference})`;
-        console.log(`ok    ${venue.query} -> ${row.name}: ${verdict}`);
-      } catch (error) {
-        if (error instanceof RateLimitExhausted) throw error;
-        failed.push(venue.query);
-        console.error(`FAIL  ${venue.query}: ${error instanceof Error ? error.message : error}`);
-      }
+    const outcomes = await ingestVenues(api, venues, (row) => storeCourse(db, row), report);
+    const failed = outcomes.filter((o) => !o.ok).map((o) => o.venue.query);
+    if (failed.length > 0) {
+      console.error(`${failed.length} of ${venues.length} failed: ${failed.join(", ")}`);
+      process.exitCode = 1;
     }
   } finally {
     const [count] = await db
@@ -72,11 +70,6 @@ async function main() {
       `${api.requestsSent} requests sent. ${count?.n ?? 0} OpenGolfAPI courses stored.`,
     );
     await client.end();
-  }
-
-  if (failed.length > 0) {
-    console.error(`${failed.length} of ${venues.length} failed: ${failed.join(", ")}`);
-    process.exitCode = 1;
   }
 }
 
