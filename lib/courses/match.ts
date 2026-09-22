@@ -322,7 +322,7 @@ export function matchCourse(
 ): MatchResult {
   const truncated = truncation(candidates, total);
   if (truncated) return truncated;
-  const where = state ?? "no US state";
+  const where = state ?? "outside the US";
 
   const tiers: [CourseMatch, (c: Candidate) => boolean][] = [
     ["exact", (c) => collapse(c.course_name) === collapse(name)],
@@ -344,7 +344,7 @@ export function matchCourse(
     if (only && only.state !== state) {
       return {
         status: "near-miss",
-        reason: `the one course that reads as this name is in ${only.state ?? "no US state"}, not ${where}`,
+        reason: `the one course that reads as this name is ${only.state ? `in ${only.state}` : "outside the US"}, not ${where}`,
         candidates,
       };
     }

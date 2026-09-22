@@ -251,7 +251,10 @@ export async function planCourses(
     }
   } catch (error) {
     if (!(error instanceof RateLimitExhausted)) throw error;
-    throw new RunStopped(`having searched for ${searched} of ${searches.length} Courses`, error);
+    throw new RunStopped(
+      `having searched for ${searched} of ${searches.length} Courses`,
+      error,
+    );
   }
 
   const ids = [
@@ -312,4 +315,3 @@ export async function planCourses(
     rows,
   };
 }
-

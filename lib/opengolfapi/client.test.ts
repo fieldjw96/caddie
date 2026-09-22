@@ -80,6 +80,20 @@ describe("OpenGolfApiClient", () => {
     await expect(api.get("/a", anything)).rejects.toThrow(RequestError);
   });
 
+  it("says in advance whether a number of requests can still be sent", async () => {
+    const { api } = client(
+      { "/a": { body: { ok: true }, headers: { "x-ratelimit-remaining": "3" } } },
+      { budget: 10 },
+    );
+    expect(() => api.ensure(10)).not.toThrow();
+    expect(() => api.ensure(11)).toThrow(/11 more requests are needed and 10 remain/);
+    await api.get("/a", anything);
+    // The server's count, lower than what is left of the budget, is the one that binds.
+    expect(api.remainingToday).toBe(3);
+    expect(() => api.ensure(3)).not.toThrow();
+    expect(() => api.ensure(4)).toThrow(RateLimitExhausted);
+  });
+
   it("parses every body through the schema it is given", async () => {
     const { api } = client({ "/a": { body: { ok: "yes" } } });
     await expect(api.get("/a", anything)).rejects.toThrow(ShapeError);

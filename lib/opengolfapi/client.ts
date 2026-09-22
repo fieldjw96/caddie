@@ -20,13 +20,14 @@ export const DAILY_REQUEST_LIMIT = 500;
 export const MIN_REQUEST_INTERVAL_MS = 1_000;
 
 /**
- * The daily allowance is used up, by this run or by anything else sharing the address. Every
- * later request would fail the same way, so this ends the run rather than one course.
+ * The daily allowance is used up, by this run or by anything else sharing the address, or
+ * too little of it is left for what the run still needs. Every later request would fail the
+ * same way, so this ends the run rather than one course.
  */
 export class RateLimitExhausted extends Error {
   constructor(detail: string) {
     super(
-      `OpenGolfAPI's daily limit of ${DAILY_REQUEST_LIMIT} requests is used up: ${detail}`,
+      `Out of OpenGolfAPI requests, which are limited to ${DAILY_REQUEST_LIMIT} a day: ${detail}`,
     );
     this.name = "RateLimitExhausted";
   }
@@ -88,7 +89,9 @@ export class OpenGolfApiClient {
     const left = this.budget - this.sent;
     const available = this.remaining === null ? left : Math.min(left, this.remaining);
     if (available < count) {
-      throw new RateLimitExhausted(`${count} more requests are needed and ${available} remain`);
+      throw new RateLimitExhausted(
+        `${count} more requests are needed and ${available} remain`,
+      );
     }
   }
 

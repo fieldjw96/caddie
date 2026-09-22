@@ -39,6 +39,7 @@ const bodies: Record<string, () => Row> = {
     start_date: "2026-04-09",
     end_date: "2026-04-12",
     course_id: courseId,
+    course_match: "exact",
   }),
   results: () => ({
     player_id: playerId,
