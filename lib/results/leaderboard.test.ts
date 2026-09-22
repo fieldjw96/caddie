@@ -67,7 +67,7 @@ describe("parseLeaderboard", () => {
 
   it("keeps the finish and drops the rounds of a line whose total does not add up, and says so", () => {
     const lines = fieldLines(2 * LINES_PER_DOUBTFUL_SCORE);
-    lines[0]!.score = "70-70-70-70=281";
+    lines[0]!.score = "70 - 70 - 70 - 70 = 281";
     lines[1]!.score = "71-67-71-70-279";
     const { entries, doubtfulScores } = readLeaderboard(leaderboardArticle(lines));
 

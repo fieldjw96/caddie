@@ -36,7 +36,7 @@ export const LINES_PER_DOUBTFUL_SCORE = 20;
 const NO_SCORE = /^[-–—]?$/;
 
 /** A cell made of two- and three-digit numbers and the separators between them, and no more. */
-const SCORE_LIKE = /^[0-9]{2,3}(?:s*[-–=]s*[0-9]{2,3}){0,5}$/;
+const SCORE_LIKE = /^[0-9]{2,3}(?:\s*[-–=]\s*[0-9]{2,3}){0,5}$/;
 
 /**
  * A score cell: `72-66-66-73=277` for four rounds, `74-73=147` for a missed cut, `72` for a

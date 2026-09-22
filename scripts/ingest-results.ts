@@ -1,10 +1,12 @@
 // `npm run ingest:results`. Reads every finishing position openly available for last season
-// and this one, and writes one `results` row per matched Player per Tournament. Two shapes of
-// table, recorded apart in `results.basis` because they are not equally trustworthy:
+// and this one, and writes one `results` row per matched Player per Tournament. Three tables,
+// in two shapes recorded apart in `results.basis` because they are not equally trustworthy:
 //
 // - each event's own full-field leaderboard, with round scores, where the season's schedule
 //   links the event to an article of its own (the majors and the Players). Read directly,
 //   as soon as the event has been played, whether or not the season is over;
+// - the season's FedEx Cup Playoffs article, each playoff event's finishes for every Player
+//   who qualified for it, written up as the playoffs are played (`standings` basis);
 // - the season article's FedEx Cup standings table, the top 30 Players' finishes in the
 //   majors, the Players, the signature events and the playoffs. Only there once a season is
 //   over, and still read where it is, because it is the only source of finishes in the
@@ -25,7 +27,7 @@ import type { ResultRecord, SourcedEvent } from "../lib/results/ingest";
 import { readLeaderboard } from "../lib/results/leaderboard";
 import { PlayerIndex } from "../lib/results/names";
 import { defaultSeasons, enoughEvents, eventArticles } from "../lib/results/season";
-import { readPlayoffs } from "../lib/results/playoffs";
+import { PLAYOFFS_TABLE, readPlayoffs } from "../lib/results/playoffs";
 import { readStandings } from "../lib/results/standings";
 import type { EventFailure } from "../lib/results/types";
 import { parseSchedule } from "../lib/schedule/parse";
@@ -127,9 +129,16 @@ async function ingestSeason(
         `${playoffsNotYetPlayed.length} not yet played, ${parsed.failures.length} failed.`,
     );
   } catch (error) {
-    if (!(error instanceof MissingArticleError)) throw error;
-    missing.push(playoffsTitle);
-    console.log(`Playoffs table: "${playoffsTitle}" has no article yet.`);
+    if (error instanceof MissingArticleError) {
+      missing.push(playoffsTitle);
+      console.log(`Playoffs table: "${playoffsTitle}" has no article yet.`);
+    } else {
+      failures.push({
+        pageTitle: PLAYOFFS_TABLE,
+        basis: "standings",
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   const standings = await standingsSection(seasonTitle);
