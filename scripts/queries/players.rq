@@ -1,0 +1,23 @@
+# Every golfer holding a PGA Tour player identifier (wdt:P2811), the property that keeps this
+# roster to tour players rather than every golfer Wikidata knows, per docs/adr/0002. Paste this
+# into https://query.wikidata.org/sparql and run it by hand if scripts/ingest-players.ts starts
+# failing and you need to see the raw result.
+#
+#   P2811  PGA Tour golf player ID  -- what constrains the set
+#   P27    country of citizenship   -- optional, some players carry none or several
+#   P569   date of birth            -- optional, ~99% coverage per ADR 0002
+#   P2031  start of work period     -- optional, used here as "year turned professional";
+#                                      sparse, most players have no statement for it
+#
+# A player can hold more than one P27 or a duplicated P569/P2031 statement, which produces more
+# than one row for the same player. scripts/ingest-players.ts groups by ?player and resolves
+# that deterministically rather than here: a GROUP BY combined with SERVICE wikibase:label
+# reliably 500s the query service (a Blazegraph StackOverflowError), so this file stays a flat,
+# pasteable SELECT.
+SELECT ?player ?playerLabel ?countryLabel ?dob ?turnedPro WHERE {
+  ?player wdt:P2811 [] .
+  OPTIONAL { ?player wdt:P27 ?country. }
+  OPTIONAL { ?player wdt:P569 ?dob. }
+  OPTIONAL { ?player wdt:P2031 ?turnedPro. }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+}
