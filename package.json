@@ -19,7 +19,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "ingest:courses": "tsx scripts/ingest-courses.ts",
-    "ingest:players": "tsx scripts/ingest-players.ts"
+    "ingest:players": "tsx scripts/ingest-players.ts",
+    "ingest:results": "tsx scripts/ingest-results.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

@@ -33,6 +33,13 @@ about 16 of the 500 requests a day OpenGolfAPI allows:
     npm run db:migrate
     npm run ingest:courses
 
+Results, from Wikipedia into `results`, for the most recent season with final FedEx Cup
+standings. Needs `ingest:players` first: a name matching no player is reported, never
+created. Idempotent, and about ten requests at one a second:
+
+    npm run ingest:players
+    npm run ingest:results
+
 Checks, which are what CI runs:
 
     npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build

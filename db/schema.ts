@@ -205,8 +205,28 @@ export const tournaments = pgTable(
 );
 
 /**
+ * Which kind of table a Result was read from, because the two are not equally trustworthy.
+ *
+ * - `leaderboard`: an event article's own full-field final leaderboard, every Player who
+ *   teed off, with their round-by-round scores.
+ * - `standings`: the season article's FedEx Cup standings table, which gives only the top 30
+ *   Players' finishes in the majors, signature and playoff events, and no scores at all. A
+ *   Player's presence there is conditioned on a good season, so these rows are a biased
+ *   sample and must never be read as a field.
+ */
+export const resultBasis = pgEnum("result_basis", ["leaderboard", "standings"]);
+
+export type ResultBasis = (typeof resultBasis.enumValues)[number];
+
+/**
  * One Player's finish in one Tournament. `position` is null when the Player has no finishing
- * position, having missed the cut or withdrawn. A tie shares its position.
+ * position, having missed the cut or withdrawn; `finish` keeps the Source's own label (`T14`,
+ * `CUT`, `WD`) so the reason is not lost. A tie shares its position.
+ *
+ * Round scores are strokes, exactly as the leaderboard prints them, and null where it prints
+ * none: a Player who missed the cut has no third round, and a standings row has no rounds at
+ * all. A null is never filled in with an average, a zero or a guess, and the database refuses
+ * a round score on a `standings` row outright.
  */
 export const results = pgTable(
   "results",
@@ -219,11 +239,31 @@ export const results = pgTable(
       .notNull()
       .references(() => tournaments.id),
     position: integer("position"),
+    basis: resultBasis("basis").notNull(),
+    finish: text("finish").notNull(),
+    round1: integer("round_1"),
+    round2: integer("round_2"),
+    round3: integer("round_3"),
+    round4: integer("round_4"),
     ...provenance,
   },
   (t) => [
     uniqueIndex("results_player_tournament_unique").on(t.playerId, t.tournamentId),
     check("results_position_is_positive", sql`${t.position} is null or ${t.position} >= 1`),
+    check(
+      "results_standings_have_no_rounds",
+      sql`${t.basis} <> 'standings' or (
+        ${t.round1} is null and ${t.round2} is null and ${t.round3} is null and ${t.round4} is null
+      )`,
+    ),
+    check(
+      "results_rounds_are_positive",
+      sql`(${t.round1} is null or ${t.round1} >= 1)
+        and (${t.round2} is null or ${t.round2} >= 1)
+        and (${t.round3} is null or ${t.round3} >= 1)
+        and (${t.round4} is null or ${t.round4} >= 1)`,
+    ),
+    check("results_finish_is_recorded", sql`btrim(${t.finish}) <> ''`),
     sourceIsRecorded("results", t),
   ],
 );
