@@ -1,10 +1,61 @@
 /**
- * The Fit Score's arithmetic lives here, apart from anything that fetches or renders, so it
- * can be tested without either. See CONTEXT.md for what a Course Trait, a Player Strength and
- * a Weighting are, and docs/adr/0001 for why every Strength is Derived rather than read.
+ * THE FIT SCORE
  *
- * This file currently holds only the normalisation the scoring will be built on. The model
- * itself is a Ticket.
+ * What it means. A Fit Score says how well one Player's game suits one Course, as we see it.
+ * It is an opinion with its arithmetic on display. The facts going in are the Course's Traits
+ * (how long it is, how hard it punishes a bad shot, how many par 5s it has) and the Player's
+ * Strengths (how much of the field they have beaten, over their record and lately). The
+ * opinions going in are ours and are all declared in this file: which Strength each Trait
+ * calls for, and how much each Trait counts, its Weighting. A reader who disagrees with a
+ * Weighting can change it and see the new answer. Nothing here is fitted to past results,
+ * and docs/adr/0002 records why: the open data covers about six venue-seasons a year, too few
+ * to tell what a course rewards from who happened to be playing it.
+ *
+ * What it does not mean. It is not a prediction of who will win, or of where anybody will
+ * finish, and it is not a probability of anything. A Player with the highest Fit Score is the
+ * one whose record best matches what this Course asks for, on our Weightings. Nothing more.
+ *
+ * How it is worked out, in four steps.
+ *
+ * 1. Each Trait is placed on a scale from 0 to 1 within a fixed range stated below: a Course
+ *    at the bottom of the range is 0, at the top 1. This is how much the Course asks for the
+ *    Strength that Trait calls for. A very long Course asks a lot of all-round class; a short
+ *    one asks little.
+ *
+ * 2. Each Strength is already a share of the field beaten, 0 to 1, where 0.5 is exactly the
+ *    middle of the field. It is turned into an edge, from -1 to +1: (2 x Strength) - 1. A
+ *    Player who beats three quarters of the field has an edge of +0.5; one who beats a
+ *    quarter has an edge of -0.5.
+ *
+ * 3. Each Trait's contribution is its Weighting x how much the Course asks x the Player's
+ *    edge. A strong Player gains most where the Course asks most; a weak one loses most there.
+ *
+ * 4. The Fit Score is the sum of the contributions. With the default Weightings, which add up
+ *    to 1, it runs from -1 to +1. In general it lies between minus and plus the total of the
+ *    Weightings: the arithmetic never rescales the reader's Weightings behind their back, so
+ *    raising a Weighting always moves the score the way the reader would expect. Zero means
+ *    the Course's demands leave this Player exactly level with the middle of the field.
+ *
+ * Why a fixed range, not the field of courses. Normalising against the Courses we happen to
+ * hold would move every score whenever a Course is added or refused, and our set of Courses
+ * is small and changes weekly. A fixed range, taken from what tour Courses play at, means a
+ * Course's figure depends on that Course alone, and the page can print the range beside it.
+ * A value beyond the range is clamped to its end, never extrapolated.
+ *
+ * Unknown is not zero. A Strength of zero would mean "finishes last every week"; a null
+ * Strength means "we do not have the record to say". So a null Strength, or a Trait the Course
+ * lacks (for instance because its hole-by-hole data failed the check in lib/course-traits.ts),
+ * produces a null contribution, which adds nothing either way and is shown as unknown. The
+ * result carries how much of the Weighting it rests on, so the page can say so. A Player with
+ * no known contribution at all gets a null Fit Score, not a zero, and `rankFits` puts them in
+ * a group of their own rather than at the bottom.
+ *
+ * A venue record is not in the score. It is a record at this Course, not a match between a
+ * Trait and a kind of game, and it rests on a handful of results where it exists at all. The
+ * page shows it beside the Fit Score rather than inside it.
+ *
+ * This module is pure: it imports nothing, reads no database and makes no network call. It is
+ * handed its inputs, and fit.test.ts checks its import graph stays that way.
  */
 
 /**
@@ -20,4 +71,192 @@ export function normalise(value: number, min: number, max: number): number {
   if (max === min) return 0.5;
   const clamped = Math.min(Math.max(value, min), max);
   return (clamped - min) / (max - min);
+}
+
+/** The Strengths a Trait can call for: see lib/strengths/derive.ts for what each one is. */
+export type FitStrengthName = "skill" | "form";
+
+/** The Course Traits the Fit Score weighs, as named in lib/course-traits.ts. */
+export type FitTraitName =
+  | "length_yards"
+  | "slope_rating_gap"
+  | "mean_par_4_yards"
+  | "longest_par_4_yards"
+  | "par_5_share";
+
+export interface TraitScale {
+  /** The value at which the Course asks nothing of this Trait's Strength. */
+  min: number;
+  /** The value at which it asks the most. */
+  max: number;
+  /** The Strength a Course high on this Trait calls for. */
+  calls: FitStrengthName;
+}
+
+/**
+ * Each Trait's fixed range, and the Strength it calls for. The ranges span what PGA Tour
+ * Courses play at from their championship tees, so almost every Course lands inside them.
+ */
+export const TRAIT_SCALES: Readonly<Record<FitTraitName, TraitScale>> = {
+  // From a short tour course, about 6,900 yards, to the longest, about 7,800. Length spreads
+  // the field: every approach is a longer club, so a lapse costs more, and class tells.
+  length_yards: { min: 6_900, max: 7_800, calls: "skill" },
+  // Slope minus Course Rating, 60 to 80 points across tour tees. The bigger the gap, the more
+  // the Course punishes a wayward shot, which costs a weaker game more than a stronger one.
+  slope_rating_gap: { min: 60, max: 80, calls: "skill" },
+  // The average par 4, 400 to 480 yards. Like total length, but measured on the holes where
+  // most of a round's approach shots are played, so par 5s do not inflate it.
+  mean_par_4_yards: { min: 400, max: 480, calls: "skill" },
+  // The longest par 4, 460 to 540 yards: whether one hole asks for a long iron into a green.
+  longest_par_4_yards: { min: 460, max: 540, calls: "skill" },
+  // Par 5s as a share of eighteen holes, from 2 of 18 to 5 of 18. More par 5s mean more
+  // chances to make birdie, which rewards a Player making birdies now: Form, not the record.
+  par_5_share: { min: 2 / 18, max: 5 / 18, calls: "form" },
+};
+
+/** How much each Trait counts. Any non-negative numbers: they need not add up to 1. */
+export type Weightings = Readonly<Record<FitTraitName, number>>;
+
+/**
+ * Our declared Weightings, shown on the page and where its sliders start. They add up to 1,
+ * so the default Fit Score runs from -1 to +1.
+ */
+export const DEFAULT_WEIGHTINGS: Weightings = {
+  // The heaviest, because it is the one Trait every Course has, read off its own published
+  // card, and the plainest statement of how demanding a Course is.
+  length_yards: 0.3,
+  // Nearly as heavy: the only published measure of how hard a Course plays beyond its length.
+  slope_rating_gap: 0.25,
+  // Where par 4s are long, the approach game is tested all round. Lighter than total length
+  // because it overlaps with it, and because it is refused when hole data is untrusted.
+  mean_par_4_yards: 0.15,
+  // One hole's worth of the same idea, so the lightest.
+  longest_par_4_yards: 0.1,
+  // The one Trait that calls for Form: enough to separate a hot Player at a birdie-fest, not
+  // so much that a few weeks outweigh a record.
+  par_5_share: 0.2,
+};
+
+/** A Course's Traits by name. A Trait that is absent or null is unknown for this Course. */
+export type FitCourseTraits = Readonly<Partial<Record<FitTraitName, number | null>>>;
+
+/** A Player's Strengths by name, each 0 to 1 or null when there is too little record to say. */
+export type FitPlayerStrengths = Readonly<Partial<Record<FitStrengthName, number | null>>>;
+
+/** One Trait's line in the working, enough to explain it without recomputing anything. */
+export interface FitComponent {
+  trait: FitTraitName;
+  /** The Course's own value, or null if the Course lacks this Trait. */
+  traitValue: number | null;
+  /** The fixed range the value was placed in. */
+  range: { min: number; max: number };
+  /** How much the Course asks for the Strength, 0 to 1; null if the Trait is unknown. */
+  normalised: number | null;
+  weight: number;
+  /** The Strength this Trait calls for. */
+  strength: FitStrengthName;
+  /** The Player's value of that Strength, 0 to 1, or null if unknown. */
+  strengthValue: number | null;
+  /** (2 x strengthValue) - 1, from -1 to +1, or null if the Strength is unknown. */
+  edge: number | null;
+  /** weight x normalised x edge, or null if either is unknown. Never a stand-in zero. */
+  contribution: number | null;
+}
+
+export interface FitScore {
+  /** The sum of the known contributions, or null when none is known. */
+  score: number | null;
+  /** Every Trait's working, in the order of TRAIT_SCALES. */
+  components: FitComponent[];
+  /** The total of the Weightings: the score lies between minus and plus this. */
+  totalWeight: number;
+  /** The Weighting resting on known contributions, out of totalWeight. */
+  knownWeight: number;
+}
+
+export const FIT_TRAITS = Object.keys(TRAIT_SCALES) as FitTraitName[];
+
+function checkWeightings(weightings: Weightings): void {
+  for (const trait of FIT_TRAITS) {
+    const weight = weightings[trait];
+    if (!Number.isFinite(weight) || weight < 0) {
+      throw new RangeError(
+        `Weighting for ${trait} must be a finite number >= 0, got ${weight}`,
+      );
+    }
+  }
+}
+
+function checkStrength(name: FitStrengthName, value: number | null): number | null {
+  if (value === null) return null;
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new RangeError(`Strength ${name} must be between 0 and 1 or null, got ${value}`);
+  }
+  return value;
+}
+
+/**
+ * One Player's Fit Score at one Course, with every Trait's working broken out. Weightings are
+ * an argument so the page can pass whatever the reader has set the sliders to.
+ */
+export function fitScore(
+  traits: FitCourseTraits,
+  strengths: FitPlayerStrengths,
+  weightings: Weightings = DEFAULT_WEIGHTINGS,
+): FitScore {
+  checkWeightings(weightings);
+
+  let score: number | null = null;
+  let totalWeight = 0;
+  let knownWeight = 0;
+
+  const components = FIT_TRAITS.map((trait): FitComponent => {
+    const { min, max, calls } = TRAIT_SCALES[trait];
+    const weight = weightings[trait];
+    const traitValue = traits[trait] ?? null;
+    const normalised = traitValue === null ? null : normalise(traitValue, min, max);
+    const strengthValue = checkStrength(calls, strengths[calls] ?? null);
+    const edge = strengthValue === null ? null : 2 * strengthValue - 1;
+    const contribution =
+      normalised === null || edge === null ? null : weight * normalised * edge;
+
+    totalWeight += weight;
+    if (contribution !== null) {
+      score = (score ?? 0) + contribution;
+      knownWeight += weight;
+    }
+    return {
+      trait,
+      traitValue,
+      range: { min, max },
+      normalised,
+      weight,
+      strength: calls,
+      strengthValue,
+      edge,
+      contribution,
+    };
+  });
+
+  return { score, components, totalWeight, knownWeight };
+}
+
+export interface RankedFits<P> {
+  /** Players with a Fit Score, highest first. Ties keep the order they were given in. */
+  scored: { player: P; fit: FitScore & { score: number } }[];
+  /** Players with no Fit Score: not ranked, because unknown is not last. */
+  unscored: { player: P; fit: FitScore }[];
+}
+
+/** Splits Players into those with a Fit Score, ranked, and those without one. */
+export function rankFits<P>(entries: readonly { player: P; fit: FitScore }[]): RankedFits<P> {
+  const scored: RankedFits<P>["scored"] = [];
+  const unscored: RankedFits<P>["unscored"] = [];
+  for (const { player, fit } of entries) {
+    const { score } = fit;
+    if (score === null) unscored.push({ player, fit });
+    else scored.push({ player, fit: { ...fit, score } });
+  }
+  scored.sort((a, b) => b.fit.score - a.fit.score);
+  return { scored, unscored };
 }
