@@ -32,6 +32,12 @@ in 2022.
 
 ## The decision
 
+> **Amended by ADR 0002.** The test below is drawn too tight. It is the right to publish
+> that matters, and an explicit written grant is such a right just as an open licence is.
+> ADR 0002 also records what calling these sources actually showed, and why a learned
+> course-fit model is out of scope. The prohibitions in this ADR all still stand, and so
+> does everything below about Source and Derived.
+
 **Only data under an open licence may be stored or displayed.** Wikidata (CC0), Wikipedia
 (CC BY-SA 4.0), OpenGolfAPI (ODbL 1.0). Each carries its attribution obligation and the site
 discharges it visibly.
@@ -54,7 +60,7 @@ constraint is the reason the analysis exists rather than an excuse for it being 
 the way it is elsewhere; it is a licensing decision with a public page at the end of it.
 
 **If a Source's terms are ambiguous rather than open, it does not go in on a judgement call.**
-Ask the provider in writing and keep the reply. Slash Golf is the live example: their free tier
+Ask the provider in writing and keep the reply. Slash Golf was the live example, and ADR 0002 records how it resolved: it publishes no terms at all, which is a refusal rather than an ambiguity. What follows is the reasoning as it stood when this ADR was written: their free tier
 would give us hole-by-hole scorecards, which is exactly the raw input our Derived measures need,
 and their terms say nothing either way about public display. That is a question to ask, not to
 assume.
