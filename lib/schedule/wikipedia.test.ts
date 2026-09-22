@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchArticle, fetchIntro, revisionUrl } from "./wikipedia";
+import { fetchArticle, fetchIntro, MissingArticleError, revisionUrl } from "./wikipedia";
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -63,12 +63,28 @@ describe("fetchArticle", () => {
       "fetch",
       vi
         .fn()
+        .mockResolvedValue(jsonResponse({ error: { code: "badvalue", info: "bad section" } })),
+    );
+
+    const error = await callThrough(() => fetchArticle("2026 PGA Tour")).catch((e) => e);
+    expect(error).not.toBeInstanceOf(MissingArticleError);
+    expect(String(error)).toMatch(/badvalue/);
+    expect(String(error)).toMatch(/2026 PGA Tour/);
+  });
+
+  it("throws a MissingArticleError, naming the page, when the article does not exist", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
         .mockResolvedValue(jsonResponse({ error: { code: "missingtitle", info: "gone" } })),
     );
 
-    await expect(callThrough(() => fetchArticle("Nonexistent Page"))).rejects.toThrow(
-      /missingtitle/,
+    const error = await callThrough(() => fetchArticle("2027 Masters Tournament")).catch(
+      (e) => e,
     );
+    expect(error).toBeInstanceOf(MissingArticleError);
+    expect(String(error)).toMatch(/2027 Masters Tournament/);
   });
 
   it("throws when the response no longer matches the expected shape", async () => {
