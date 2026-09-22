@@ -5,17 +5,23 @@
 import type { CourseHole, CourseMatch, CourseTee, courses } from "../../db/schema";
 import {
   declaredFor,
+  implausibleRecord,
   matchCourse,
   matchDeclared,
   scheduledCourses,
-  searchQuery,
+  searchQueries,
   stateCode,
   type Candidate,
   type MatchResult,
 } from "../courses/match";
 import { OPENGOLFAPI_BASE_URL, RateLimitExhausted, type OpenGolfApiClient } from "./client";
 import { checkHoles } from "./holes";
-import { courseResponse, searchResponse, type CourseResponse } from "./schema";
+import {
+  courseResponse,
+  searchResponse,
+  type CourseResponse,
+  type SearchResponse,
+} from "./schema";
 
 export function sourceUrl(id: string): string {
   return `${OPENGOLFAPI_BASE_URL}/api/v1/courses/${encodeURIComponent(id)}`;
@@ -115,19 +121,24 @@ const described = (c: Candidate) => `${c.course_name} (${c.state ?? "no state"})
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : `${error}`);
 
 type Search = {
-  query: string;
+  /** Tried in order until one returns anything. */
+  queries: string[];
   state: string;
-  match: (found: Candidate[]) => MatchResult;
+  match: (found: Candidate[], total: number) => MatchResult;
 };
+
+/** Requests a search can cost at most: every query, and then its course's record. */
+const MAX_QUERIES = 2;
+const MAX_REQUESTS_PER_COURSE = MAX_QUERIES + 1;
 
 /** What to search for a schedule name, or why it cannot be searched for. */
 function lookupFor(courseName: string, location: string | null): Search | { reason: string } {
   const declared = declaredFor(courseName);
   if (declared) {
     return {
-      query: declared.query,
+      queries: [declared.query],
       state: declared.state,
-      match: (found) => matchDeclared(declared, found),
+      match: (found, total) => matchDeclared(declared, found, total),
     };
   }
   const listed = scheduledCourses(courseName);
@@ -136,7 +147,8 @@ function lookupFor(courseName: string, location: string | null): Search | { reas
   if (others.length > 0) {
     return {
       reason:
-        `it lists ${listed.length} courses (${listed.join("; ")}), and which one the ` +
+        `it lists ${listed.length} courses (${listed.map((c) => c.name).join("; ")}), ` +
+        "and which one the " +
         "Tournament is played on has not been declared",
     };
   }
@@ -145,9 +157,9 @@ function lookupFor(courseName: string, location: string | null): Search | { reas
     return { reason: `its Location, ${location ?? "none"}, is not a US state to search within` };
   }
   return {
-    query: searchQuery(host),
+    queries: searchQueries(host.club).slice(0, MAX_QUERIES),
     state,
-    match: (found) => matchCourse(host, state, found),
+    match: (found, total) => matchCourse(host.name, state, found, total),
   };
 }
 
@@ -195,13 +207,17 @@ export async function planCourses(
   let searched = 0;
   try {
     for (const { key, courseName, search } of searches) {
-      // Two for each search left, this one included: the search, and its course's record.
-      client.ensure(2 * (searches.length - searched));
+      // The most each search left could cost, this one included.
+      client.ensure(MAX_REQUESTS_PER_COURSE * (searches.length - searched));
       try {
-        const params = new URLSearchParams({ q: search.query, state: search.state });
-        const found = await client.get(`/v1/courses/search?${params}`, searchResponse);
-        attribution = found._attribution;
-        const result = search.match(found.courses);
+        let found: SearchResponse | null = null;
+        for (const q of search.queries) {
+          const params = new URLSearchParams({ q, state: search.state });
+          found = await client.get(`/v1/courses/search?${params}`, searchResponse);
+          attribution = found._attribution;
+          if (found.courses.length > 0) break;
+        }
+        const result = search.match(found?.courses ?? [], found?.total ?? 0);
         resolutions.set(
           key,
           result.status === "matched"
@@ -241,6 +257,18 @@ export async function planCourses(
       ),
     ),
   ];
+  /** A record that cannot be used costs every Tournament matched to it its match. */
+  const unmatch = (id: string, why: string) => {
+    for (const [key, r] of resolutions) {
+      if (r.status === "matched" && r.openGolfApiId === id) {
+        resolutions.set(key, {
+          status: "failed",
+          scheduleName: r.scheduleName,
+          reason: `matched "${r.openGolfApiName}" [${r.confidence}], but ${why}`,
+        });
+      }
+    }
+  };
   const rows: CourseRow[] = [];
   let fetched = 0;
   try {
@@ -251,20 +279,16 @@ export async function planCourses(
           `/api/v1/courses/${encodeURIComponent(id)}`,
           courseResponse,
         );
-        // A match exists only after a search succeeded, so attribution has been read.
-        rows.push(toCourseRow(course, attribution!));
+        const implausible = implausibleRecord(course.par, course.yardage);
+        if (implausible) {
+          unmatch(id, implausible);
+        } else {
+          // A match exists only after a search succeeded, so attribution has been read.
+          rows.push(toCourseRow(course, attribution!));
+        }
       } catch (error) {
         if (error instanceof RateLimitExhausted) throw error;
-        // A record that cannot be read costs every Tournament matched to it its match.
-        for (const [key, r] of resolutions) {
-          if (r.status === "matched" && r.openGolfApiId === id) {
-            resolutions.set(key, {
-              status: "failed",
-              scheduleName: r.scheduleName,
-              reason: `matched ${r.openGolfApiName}, whose record could not be read: ${messageOf(error)}`,
-            });
-          }
-        }
+        unmatch(id, `its record could not be read: ${messageOf(error)}`);
       }
       fetched += 1;
     }
