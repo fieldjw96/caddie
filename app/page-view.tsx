@@ -38,7 +38,10 @@ export const LICENCES = {
 
 function Attribution({ data }: { data: PageData | null }) {
   return (
-    <footer aria-labelledby="attribution" className="mt-12 border-t border-rule pt-6 text-sm">
+    <footer
+      aria-labelledby="attribution"
+      className="mt-12 border-t border-rule pt-6 text-sm break-words"
+    >
       <h2 id="attribution" className="text-base font-semibold">
         Where this comes from
       </h2>
@@ -116,7 +119,7 @@ export function PageView({ data }: { data: PageData | null }) {
   const holesTrusted = course?.holesTrusted === true;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
+    <main className="mx-auto max-w-5xl px-4 py-8 break-words sm:py-10">
       <p className="text-sm text-muted">Caddie · the next PGA Tour Tournament</p>
       <header aria-labelledby="tournament">
         <h1 id="tournament" className="mt-1 text-3xl leading-tight font-semibold sm:text-4xl">

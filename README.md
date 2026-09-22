@@ -52,6 +52,10 @@ ended up with nothing at all. `-- 2025-09-01` derives as of a named day instead 
 
     npm run derive:strengths
 
+The page, at `/`, reads all of the above from `DATABASE_URL` at request time: the next
+Tournament, its Course Profile, the roster ordered by Fit Score, and what is not known.
+With no upcoming Tournament stored it says so rather than showing an empty ranking.
+
 Checks, which are what CI runs:
 
     npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build

@@ -153,7 +153,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
         venueRecord: get(p.id, venueKey),
       })),
     coverage: {
-      seasons: [...new Set(coverageRows.map((r) => r.season))].sort(),
+      seasons: [...new Set(coverageRows.map((r) => r.season))].sort((a, b) => a - b),
       leaderboardEvents: eventNames("leaderboard"),
       standingsEvents: eventNames("standings"),
     },
