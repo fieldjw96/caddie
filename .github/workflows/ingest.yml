@@ -1,6 +1,6 @@
-# The only thing that writes to production. The site reads; this populates what it reads,
-# from nothing if need be: migrations first, then every ingest in dependency order, then a
-# count of what is stored. See lib/ingest/stages.ts for the order and why it is that order.
+# The only thing that writes data to production (migrate.yml writes only its schema). The site
+# reads; this populates what it reads, from nothing if need be: migrations first, then every
+# ingest in dependency order, then a count of what is stored. See lib/ingest/stages.ts for the order and why it is that order.
 #
 # Daily, at 06:17 UTC, and by hand from the Actions tab. Golf results change weekly at most,
 # after a Tournament's Sunday, and the schedule and course facts more rarely still, so a day
@@ -35,7 +35,16 @@ permissions:
   contents: read
 
 jobs:
+  # The same job that runs on every push to main, before any stage. The migrate stage below
+  # then finds nothing left to apply. It stays in so the stages still run as one sequence from
+  # nothing, locally too. Both run `npm run db:migrate` over the same db/migrations, so this
+  # ingest and the migrate workflow cannot disagree about the schema, and if production's
+  # migration fails, no stage writes.
+  migrate:
+    uses: ./.github/workflows/migrate.yml
+
   ingest:
+    needs: migrate
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

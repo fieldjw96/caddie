@@ -98,7 +98,48 @@ fails if any log still shows a credential. The same stages run locally, one at a
 
     npm run ingest:stage -- courses
 
-The site itself only reads. Nothing but that workflow writes to production.
+The site itself only reads. Nothing but that workflow and the migrations below write to
+production.
+
+## Is production working
+
+The checks below read the source tree, and they can all pass while the deployed site returns
+an error to every reader. On 2026-09-22 that is what happened. Two workflows address it:
+
+- `.github/workflows/smoke.yml` asks production itself. It runs after every Production
+  deployment, every hour and by hand. It requires HTTP 200, a Tournament named in the page's
+  heading, at least one Player row and no Next.js error digest. A failure opens an issue
+  titled "Production is failing its smoke check", or comments on the one already open, and
+  the next pass closes it. It checks the address in `lib/production.ts`, the only file that
+  holds that address, and takes no other address, so it cannot pass by checking a dev server
+  or a preview deployment. To run it yourself:
+
+      npm run smoke
+
+- `.github/workflows/migrate.yml` applies migrations to production on every push to `main`,
+  instead of waiting for the next daily ingest. It runs in the GitHub Environment
+  `production`, and its credential is that environment's secret, not a repository secret. It
+  needs a one-time setup:
+
+      gh api -X PUT repos/fieldjw96/caddie/environments/production \
+        -F 'deployment_branch_policy[protected_branches]=false' \
+        -F 'deployment_branch_policy[custom_branch_policies]=true'
+      gh api -X POST repos/fieldjw96/caddie/environments/production/deployment-branch-policies \
+        -f name=main -f type=branch
+      gh secret set POSTGRES_URL_NON_POOLING --env production
+
+  The value must be the direct connection (Supabase's `POSTGRES_URL_NON_POOLING`), not the
+  pooled one; the workflow refuses a value that looks pooled. GitHub compares environment
+  names without regard to case, so this is the same `Production` environment Vercel reports
+  its deployments to. Vercel only deploys `main` there, so limiting it to `main` takes nothing
+  away from Vercel.
+
+  The daily ingest runs this same workflow as its first job, and its later stages wait for
+  it, so the ingest never writes to a schema older than `main`.
+
+  Vercel builds the same push at the same time as this workflow runs. To make sure new code
+  never serves traffic before its migrations are applied, add "Apply migrations to
+  production" as a required check under Deployment Checks in the Vercel project's settings.
 
 ## Checks
 

@@ -1,0 +1,94 @@
+# Asks the deployed site whether it works. Nothing else in this repo does: every other check
+# reads the source tree, and on 2026-09-22 all of them were green on every merge while
+# production answered every request with HTTP 500.
+#
+# Runs after every successful Production deployment Vercel reports to GitHub, every hour at
+# :23, and by hand. What it checks, and why a page that merely responds is not enough, is in
+# lib/smoke/check.ts. What it checks against is lib/production.ts and nothing else: a Preview
+# deployment's status event is skipped rather than checked, and scripts/smoke.ts takes no
+# address, so nothing here can pass by testing something other than production.
+#
+# A failure is not left as a red run for nobody to see. It opens an issue titled below, or
+# comments on the one already open, with what the check found and a link to the run. The next
+# passing run comments and closes it.
+
+name: Smoke
+
+on:
+  deployment_status:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: smoke
+  cancel-in-progress: false
+
+env:
+  ISSUE_TITLE: "Production is failing its smoke check"
+
+jobs:
+  smoke:
+    # Vercel names its environments "Production" and "Preview". Only a finished Production
+    # deployment is worth checking; a Preview one is not what this check is about.
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Check production
+        id: smoke
+        run: npm run smoke
+        env:
+          SMOKE_REPORT: ${{ runner.temp }}/smoke-report.md
+
+      - name: Open or update the issue
+        if: failure() && steps.smoke.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT: ${{ runner.temp }}/smoke-report.md
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TRIGGER: ${{ github.event_name }}
+        run: |
+          body="$RUNNER_TEMP/smoke-issue.md"
+          {
+            if [ -s "$REPORT" ]; then cat "$REPORT"; else echo "The smoke check failed before it could write a report."; fi
+            echo ""
+            echo "Run ($TRIGGER): $RUN_URL"
+          } > "$body"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$ISSUE_TITLE\"" \
+            --json number,title --jq "map(select(.title == env.ISSUE_TITLE)) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+            echo "::error title=Production smoke check failed::Still failing. Updated issue #$number."
+          else
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" --body-file "$body")
+            echo "::error title=Production smoke check failed::Opened $url"
+          fi
+
+      - name: Close the issue now production passes
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$ISSUE_TITLE\"" \
+            --json number,title --jq "map(select(.title == env.ISSUE_TITLE)) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "Passing again: $RUN_URL"
+          fi
