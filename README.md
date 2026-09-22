@@ -33,6 +33,11 @@ about 16 of the 500 requests a day OpenGolfAPI allows:
     npm run db:migrate
     npm run ingest:courses
 
+Course Traits, derived from the courses just ingested into `course_traits`. Idempotent, and
+refuses any Trait built on hole yardages for a course whose `holes_trusted` is false:
+
+    npm run derive:course-traits
+
 Results, from Wikipedia into `results`, for the most recent season with final FedEx Cup
 standings. Needs `ingest:players` first: a name matching no player is reported, never
 created. Idempotent, and about ten requests at one a second:
