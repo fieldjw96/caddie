@@ -8,10 +8,12 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  boolean,
   check,
   date,
   doublePrecision,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   serial,
@@ -86,7 +88,42 @@ export const players = pgTable(
   ],
 );
 
-/** One golf course, by its own name. It outlives any Tournament held there. */
+/** One set of tees as its Source publishes it: the card a round is rated from. */
+export type CourseTee = {
+  name: string;
+  gender: string | null;
+  par: number | null;
+  yardage: number | null;
+  rating: number | null;
+  slope: number | null;
+};
+
+/** One hole as fetched, before anyone has decided whether to believe its yardages. */
+export type CourseHole = {
+  number: number;
+  par: number | null;
+  /** Yardage by tee, keyed as the Source keys it (`member`, `The Players`). */
+  yardages: Record<string, number | null>;
+};
+
+/**
+ * How far, in percent, a course's hole yardages may sum from its published total before they
+ * stop being believed. More than this and `holes_trusted` is false. A whole number so that the
+ * check is integer arithmetic, in which JavaScript and Postgres cannot disagree at the edge.
+ * The database checks the same arithmetic, so the figure appears in
+ * `courses_holes_trusted_is_the_check` too.
+ */
+export const HOLE_YARDAGE_TOLERANCE_PERCENT = 3;
+
+/**
+ * One golf course, by its own name. It outlives any Tournament held there.
+ *
+ * `holes_trusted` is the contract with whatever derives Course Traits. It records whether the
+ * hole-by-hole yardages, summed, agree with the published total to within
+ * HOLE_YARDAGE_TOLERANCE_PERCENT. OpenGolfAPI returns member-tee holes for Augusta, 1,080 yards short
+ * of the card, and a Trait built on those holes would be confidently wrong. A Trait derived
+ * from hole yardages must be refused for a course where this is false.
+ */
 export const courses = pgTable(
   "courses",
   {
@@ -94,12 +131,51 @@ export const courses = pgTable(
     name: text("name").notNull(),
     wikidataId: text("wikidata_id"),
     openGolfApiId: text("opengolfapi_id"),
+    par: integer("par"),
+    /** The course's own published total, as its Source states it. Not the sum of the holes. */
+    publishedYardage: integer("published_yardage"),
+    architect: text("architect"),
+    tees: jsonb("tees").$type<CourseTee[]>(),
+    /** Hole-by-hole par and yardage exactly as fetched, trusted or not. */
+    holes: jsonb("holes").$type<CourseHole[]>(),
+    /** Which of the holes' yardage keys was summed for the check. */
+    holesCheckedTee: text("holes_checked_tee"),
+    holesYardageSum: integer("holes_yardage_sum"),
+    /** `holes_yardage_sum - published_yardage`: negative when the holes come up short. */
+    holesYardageDifference: integer("holes_yardage_difference"),
+    holesTrusted: boolean("holes_trusted"),
+    /** The attribution the Source's licence requires, ready for a page to print as it is. */
+    attribution: text("attribution"),
     ...provenance,
   },
   (t) => [
     uniqueIndex("courses_wikidata_id_unique").on(t.wikidataId),
     uniqueIndex("courses_opengolfapi_id_unique").on(t.openGolfApiId),
     sourceIsRecorded("courses", t),
+    // ODbL requires attribution, so a row from OpenGolfAPI without it cannot be stored.
+    check(
+      "courses_opengolfapi_is_attributed",
+      sql`${t.source} <> 'opengolfapi' or (${t.attribution} is not null and btrim(${t.attribution}) <> '')`,
+    ),
+    // A verdict with its working, or no verdict: `holes_trusted` never stands alone.
+    check(
+      "courses_holes_check_is_complete",
+      sql`${t.holesTrusted} is null or (
+        ${t.holes} is not null
+        and ${t.holesCheckedTee} is not null
+        and ${t.publishedYardage} is not null
+        and ${t.holesYardageSum} is not null
+        and ${t.holesYardageDifference} = ${t.holesYardageSum} - ${t.publishedYardage}
+      )`,
+    ),
+    // The verdict is the arithmetic, and the database recomputes it rather than taking the
+    // ingest code's word for it. The 3 is HOLE_YARDAGE_TOLERANCE_PERCENT.
+    check(
+      "courses_holes_trusted_is_the_check",
+      sql`${t.holesTrusted} is null or ${t.holesTrusted} = (
+        abs(${t.holesYardageDifference}) * 100 <= 3 * ${t.publishedYardage}
+      )`,
+    ),
   ],
 );
 

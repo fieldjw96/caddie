@@ -15,6 +15,13 @@
       "when": 1790046924489,
       "tag": "0001_players_country_and_turned_pro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790048136528,
+      "tag": "0002_course_facts",
+      "breakpoints": true
     }
   ]
 }

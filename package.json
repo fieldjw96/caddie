@@ -17,6 +17,7 @@
     "test:db": "vitest run --config vitest.db.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "ingest:courses": "tsx scripts/ingest-courses.ts",
     "ingest:players": "tsx scripts/ingest-players.ts"
   },
   "dependencies": {

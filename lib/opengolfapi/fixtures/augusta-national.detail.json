@@ -1,0 +1,483 @@
+{
+  "id": "9b0c9a02-fb5a-4f55-9a0b-0c7a664675e6",
+  "course_name": "Augusta National Golf Club",
+  "club_name": "Augusta National Golf Club",
+  "city": "Augusta",
+  "state": "GA",
+  "type": "Private",
+  "par": 72,
+  "holes": 18,
+  "yardage": 7445,
+  "architect": null,
+  "year_built": 1933,
+  "tees": [
+    {
+      "tee_key": "black-male",
+      "tee_name": "Black",
+      "tee_color": "black",
+      "gender": "Male",
+      "course_rating": 76.2,
+      "slope": 148,
+      "par": 72,
+      "yardage": 7445
+    },
+    {
+      "tee_key": "member-male",
+      "tee_name": "Member",
+      "tee_color": null,
+      "gender": "Male",
+      "course_rating": 67.7,
+      "slope": 118,
+      "par": 72,
+      "yardage": 6365
+    }
+  ],
+  "holes_data": [
+    {
+      "number": 1,
+      "par": 4,
+      "handicap_index": 9,
+      "yardages": {
+        "member": 365
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 2,
+      "par": 5,
+      "handicap_index": 1,
+      "yardages": {
+        "member": 515
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 3,
+      "par": 4,
+      "handicap_index": 13,
+      "yardages": {
+        "member": 340
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 4,
+      "par": 3,
+      "handicap_index": 15,
+      "yardages": {
+        "member": 170
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 5,
+      "par": 4,
+      "handicap_index": 5,
+      "yardages": {
+        "member": 400
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 6,
+      "par": 3,
+      "handicap_index": 17,
+      "yardages": {
+        "member": 165
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 7,
+      "par": 4,
+      "handicap_index": 11,
+      "yardages": {
+        "member": 330
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 8,
+      "par": 5,
+      "handicap_index": 3,
+      "yardages": {
+        "member": 480
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 9,
+      "par": 4,
+      "handicap_index": 7,
+      "yardages": {
+        "member": 395
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 10,
+      "par": 4,
+      "handicap_index": 6,
+      "yardages": {
+        "member": 450
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 11,
+      "par": 4,
+      "handicap_index": 8,
+      "yardages": {
+        "member": 400
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 12,
+      "par": 3,
+      "handicap_index": 16,
+      "yardages": {
+        "member": 145
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 13,
+      "par": 5,
+      "handicap_index": 4,
+      "yardages": {
+        "member": 455
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 14,
+      "par": 4,
+      "handicap_index": 12,
+      "yardages": {
+        "member": 380
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 15,
+      "par": 5,
+      "handicap_index": 2,
+      "yardages": {
+        "member": 475
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 16,
+      "par": 3,
+      "handicap_index": 18,
+      "yardages": {
+        "member": 145
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 17,
+      "par": 4,
+      "handicap_index": 14,
+      "yardages": {
+        "member": 370
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    },
+    {
+      "number": 18,
+      "par": 4,
+      "handicap_index": 10,
+      "yardages": {
+        "member": 385
+      },
+      "tee_coords": null,
+      "green": {
+        "center": null,
+        "front": null,
+        "back": null
+      },
+      "green_polygon": null,
+      "fairway_polygon": null,
+      "green_depth_yards": null,
+      "green_width_yards": null,
+      "landing_zone": null,
+      "dogleg": null,
+      "elevation": null,
+      "plays_like_yards": null,
+      "hazards": []
+    }
+  ],
+  "insights": {
+    "hardest_hole": {
+      "number": 2,
+      "handicap": 1,
+      "par": 5,
+      "yardage": 515
+    },
+    "easiest_hole": {
+      "number": 16,
+      "handicap": 18,
+      "par": 3,
+      "yardage": 145
+    },
+    "longest_hole": {
+      "number": 2,
+      "par": 5,
+      "yardage": 515
+    },
+    "shortest_hole": {
+      "number": 16,
+      "par": 3,
+      "yardage": 145
+    },
+    "par_3_count": 4,
+    "par_4_count": 10,
+    "par_5_count": 4,
+    "total_par": 72,
+    "hazard_count": 188,
+    "water_holes": 0,
+    "bunker_count": 62,
+    "tags": ["championship", "private", "heavily-bunkered"]
+  }
+}
