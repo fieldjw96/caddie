@@ -31,6 +31,7 @@ function championshipTee(tees: CourseTee[] | null, published: number | null) {
 /** Everything the page shows, or null when no Tournament is scheduled from `now` onwards. */
 export async function loadPageData(now: Date): Promise<PageData | null> {
   const { db } = await import("../../db/client");
+  const asOf = now.toISOString().slice(0, 10);
 
   const schedule = await db
     .select({
@@ -64,7 +65,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
 
   const venueKey = courseRow === null ? null : strengthKey("venue_record", courseRow.id);
   const keys = ["skill", "form", ...(venueKey === null ? [] : [venueKey])];
-  const [playerRows, strengthRows] = await Promise.all([
+  const [playerRows, strengthRows, rosterResultRows] = await Promise.all([
     db.select({ id: players.id, name: players.name, country: players.country }).from(players),
     db
       .select({
@@ -75,6 +76,10 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
       })
       .from(playerStrengths)
       .where(inArray(playerStrengths.strength, keys)),
+    db
+      .select({ playerId: results.playerId, endDate: tournaments.endDate })
+      .from(results)
+      .innerJoin(tournaments, eq(results.tournamentId, tournaments.id)),
   ]);
 
   const strengths = new Map<string, StrengthView>();
@@ -142,7 +147,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
     ),
     // By name, so the Players with no record read as a list and a tie in the ranking, which
     // keeps the order it was given, is alphabetical rather than arbitrary.
-    players: selectRoster(playerRows)
+    players: selectRoster(playerRows, rosterResultRows, asOf)
       .sort((a, b) => a.name.localeCompare(b.name, "en"))
       .map((p) => ({
         id: p.id,
