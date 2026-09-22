@@ -78,6 +78,30 @@ The page, at `/`, reads all of the above from `DATABASE_URL` at request time: th
 Tournament, its Course Profile, the roster ordered by Fit Score, and what is not known.
 With no upcoming Tournament stored it says so rather than showing an empty ranking.
 
-Checks, which are what CI runs:
+## Production
+
+Production needs one thing this repository cannot hold: a Postgres. Any provider will do; all
+that is asked of it is a connection string.
+
+- **The app refuses to start without it.** `db/client.ts` throws `DATABASE_URL is not set`
+  rather than fall back to anything, so a deploy with no database is a 500 on every request,
+  not an empty page. Set `DATABASE_URL` in the Vercel project to the same connection string.
+- **The ingest writes to it from the repository secret `CADDIE_DATABASE_URL`**, and from
+  nothing else. Set it with `gh secret set CADDIE_DATABASE_URL`. It never goes in a file: this
+  repository is public.
+
+[`.github/workflows/ingest.yml`](.github/workflows/ingest.yml) populates it, daily and by hand
+from the Actions tab: migrations first, then every ingest above in dependency order, one step
+per stage so a failure names its stage, then a count of what is stored, which fails the run if
+any table is empty. Every line a stage prints is redacted before it is shown, and the run
+fails if any log still shows a credential. The same stages run locally, one at a time:
+
+    npm run ingest:stage -- courses
+
+The site itself only reads. Nothing but that workflow writes to production.
+
+## Checks
+
+What CI runs:
 
     npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build
