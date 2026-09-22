@@ -1,0 +1,741 @@
+{
+  "id": "f534b48d-b1f5-4898-a54a-69a8536befff",
+  "prevId": "c65c8131-1823-4431-8fcd-90be5a85c7a9",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.course_traits": {
+      "name": "course_traits",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "course_id": {
+          "name": "course_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trait": {
+          "name": "trait",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "derivation": {
+          "name": "derivation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "course_traits_course_trait_unique": {
+          "name": "course_traits_course_trait_unique",
+          "columns": [
+            {
+              "expression": "course_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "trait",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "course_traits_course_id_courses_id_fk": {
+          "name": "course_traits_course_id_courses_id_fk",
+          "tableFrom": "course_traits",
+          "tableTo": "courses",
+          "columnsFrom": ["course_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "course_traits_source_is_recorded": {
+          "name": "course_traits_source_is_recorded",
+          "value": "(\n      \"course_traits\".\"source\" = 'derived'\n      and \"course_traits\".\"derivation\" is not null\n      and btrim(\"course_traits\".\"derivation\") <> ''\n      and \"course_traits\".\"source_url\" is null\n    ) or (\n      \"course_traits\".\"source\" <> 'derived'\n      and \"course_traits\".\"source_url\" is not null\n      and btrim(\"course_traits\".\"source_url\") <> ''\n    )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.courses": {
+      "name": "courses",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wikidata_id": {
+          "name": "wikidata_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opengolfapi_id": {
+          "name": "opengolfapi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "par": {
+          "name": "par",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "published_yardage": {
+          "name": "published_yardage",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "architect": {
+          "name": "architect",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tees": {
+          "name": "tees",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "holes": {
+          "name": "holes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "holes_checked_tee": {
+          "name": "holes_checked_tee",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "holes_yardage_sum": {
+          "name": "holes_yardage_sum",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "holes_yardage_difference": {
+          "name": "holes_yardage_difference",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "holes_trusted": {
+          "name": "holes_trusted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attribution": {
+          "name": "attribution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "derivation": {
+          "name": "derivation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "courses_wikidata_id_unique": {
+          "name": "courses_wikidata_id_unique",
+          "columns": [
+            {
+              "expression": "wikidata_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "courses_opengolfapi_id_unique": {
+          "name": "courses_opengolfapi_id_unique",
+          "columns": [
+            {
+              "expression": "opengolfapi_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "courses_source_is_recorded": {
+          "name": "courses_source_is_recorded",
+          "value": "(\n      \"courses\".\"source\" = 'derived'\n      and \"courses\".\"derivation\" is not null\n      and btrim(\"courses\".\"derivation\") <> ''\n      and \"courses\".\"source_url\" is null\n    ) or (\n      \"courses\".\"source\" <> 'derived'\n      and \"courses\".\"source_url\" is not null\n      and btrim(\"courses\".\"source_url\") <> ''\n    )"
+        },
+        "courses_opengolfapi_is_attributed": {
+          "name": "courses_opengolfapi_is_attributed",
+          "value": "\"courses\".\"source\" <> 'opengolfapi' or (\"courses\".\"attribution\" is not null and btrim(\"courses\".\"attribution\") <> '')"
+        },
+        "courses_holes_check_is_complete": {
+          "name": "courses_holes_check_is_complete",
+          "value": "\"courses\".\"holes_trusted\" is null or (\n        \"courses\".\"holes\" is not null\n        and \"courses\".\"holes_checked_tee\" is not null\n        and \"courses\".\"published_yardage\" is not null\n        and \"courses\".\"holes_yardage_sum\" is not null\n        and \"courses\".\"holes_yardage_difference\" = \"courses\".\"holes_yardage_sum\" - \"courses\".\"published_yardage\"\n      )"
+        },
+        "courses_holes_trusted_is_the_check": {
+          "name": "courses_holes_trusted_is_the_check",
+          "value": "\"courses\".\"holes_trusted\" is null or \"courses\".\"holes_trusted\" = (\n        abs(\"courses\".\"holes_yardage_difference\") * 100 <= 3 * \"courses\".\"published_yardage\"\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.player_strengths": {
+      "name": "player_strengths",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "strength": {
+          "name": "strength",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "derivation": {
+          "name": "derivation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "player_strengths_player_strength_unique": {
+          "name": "player_strengths_player_strength_unique",
+          "columns": [
+            {
+              "expression": "player_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "strength",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "player_strengths_player_id_players_id_fk": {
+          "name": "player_strengths_player_id_players_id_fk",
+          "tableFrom": "player_strengths",
+          "tableTo": "players",
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "player_strengths_are_derived": {
+          "name": "player_strengths_are_derived",
+          "value": "\"player_strengths\".\"source\" = 'derived'"
+        },
+        "player_strengths_source_is_recorded": {
+          "name": "player_strengths_source_is_recorded",
+          "value": "(\n      \"player_strengths\".\"source\" = 'derived'\n      and \"player_strengths\".\"derivation\" is not null\n      and btrim(\"player_strengths\".\"derivation\") <> ''\n      and \"player_strengths\".\"source_url\" is null\n    ) or (\n      \"player_strengths\".\"source\" <> 'derived'\n      and \"player_strengths\".\"source_url\" is not null\n      and btrim(\"player_strengths\".\"source_url\") <> ''\n    )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.players": {
+      "name": "players",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "wikidata_id": {
+          "name": "wikidata_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_of_birth": {
+          "name": "date_of_birth",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turned_professional_year": {
+          "name": "turned_professional_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "derivation": {
+          "name": "derivation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "players_wikidata_id_unique": {
+          "name": "players_wikidata_id_unique",
+          "columns": [
+            {
+              "expression": "wikidata_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "players_wikidata_id_is_a_qid": {
+          "name": "players_wikidata_id_is_a_qid",
+          "value": "\"players\".\"wikidata_id\" ~ '^Q[1-9][0-9]*$'"
+        },
+        "players_source_is_recorded": {
+          "name": "players_source_is_recorded",
+          "value": "(\n      \"players\".\"source\" = 'derived'\n      and \"players\".\"derivation\" is not null\n      and btrim(\"players\".\"derivation\") <> ''\n      and \"players\".\"source_url\" is null\n    ) or (\n      \"players\".\"source\" <> 'derived'\n      and \"players\".\"source_url\" is not null\n      and btrim(\"players\".\"source_url\") <> ''\n    )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.results": {
+      "name": "results",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "player_id": {
+          "name": "player_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tournament_id": {
+          "name": "tournament_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "derivation": {
+          "name": "derivation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "results_player_tournament_unique": {
+          "name": "results_player_tournament_unique",
+          "columns": [
+            {
+              "expression": "player_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tournament_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "results_player_id_players_id_fk": {
+          "name": "results_player_id_players_id_fk",
+          "tableFrom": "results",
+          "tableTo": "players",
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "results_tournament_id_tournaments_id_fk": {
+          "name": "results_tournament_id_tournaments_id_fk",
+          "tableFrom": "results",
+          "tableTo": "tournaments",
+          "columnsFrom": ["tournament_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "results_position_is_positive": {
+          "name": "results_position_is_positive",
+          "value": "\"results\".\"position\" is null or \"results\".\"position\" >= 1"
+        },
+        "results_source_is_recorded": {
+          "name": "results_source_is_recorded",
+          "value": "(\n      \"results\".\"source\" = 'derived'\n      and \"results\".\"derivation\" is not null\n      and btrim(\"results\".\"derivation\") <> ''\n      and \"results\".\"source_url\" is null\n    ) or (\n      \"results\".\"source\" <> 'derived'\n      and \"results\".\"source_url\" is not null\n      and btrim(\"results\".\"source_url\") <> ''\n    )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.tournaments": {
+      "name": "tournaments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "season": {
+          "name": "season",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "course_name": {
+          "name": "course_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "course_id": {
+          "name": "course_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "derivation": {
+          "name": "derivation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "tournaments_name_season_unique": {
+          "name": "tournaments_name_season_unique",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "season",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tournaments_course_id_courses_id_fk": {
+          "name": "tournaments_course_id_courses_id_fk",
+          "tableFrom": "tournaments",
+          "tableTo": "courses",
+          "columnsFrom": ["course_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "tournaments_ends_after_it_starts": {
+          "name": "tournaments_ends_after_it_starts",
+          "value": "\"tournaments\".\"end_date\" >= \"tournaments\".\"start_date\""
+        },
+        "tournaments_source_is_recorded": {
+          "name": "tournaments_source_is_recorded",
+          "value": "(\n      \"tournaments\".\"source\" = 'derived'\n      and \"tournaments\".\"derivation\" is not null\n      and btrim(\"tournaments\".\"derivation\") <> ''\n      and \"tournaments\".\"source_url\" is null\n    ) or (\n      \"tournaments\".\"source\" <> 'derived'\n      and \"tournaments\".\"source_url\" is not null\n      and btrim(\"tournaments\".\"source_url\") <> ''\n    )"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.source": {
+      "name": "source",
+      "schema": "public",
+      "values": ["wikidata", "wikipedia", "opengolfapi", "derived"]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -181,7 +181,9 @@ export const courses = pgTable(
 
 /**
  * One event on the schedule in one season. The Course is nullable because a Tournament can
- * be scheduled before its venue is known to us.
+ * be scheduled before its venue is known to us. `courseName` is the venue as written by the
+ * Source, kept even once `courseId` is null; matching it to a `courses` row is a later
+ * Ticket's job, not this table's.
  */
 export const tournaments = pgTable(
   "tournaments",
@@ -191,6 +193,7 @@ export const tournaments = pgTable(
     season: integer("season").notNull(),
     startDate: date("start_date", { mode: "string" }).notNull(),
     endDate: date("end_date", { mode: "string" }).notNull(),
+    courseName: text("course_name"),
     courseId: integer("course_id").references(() => courses.id),
     ...provenance,
   },
