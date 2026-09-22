@@ -225,7 +225,7 @@ export interface RoundStrengths {
   lowRounds: Strength;
 }
 
-const EVENTS_ONLY: Record<ResultBasis, number> = { leaderboard: 0, standings: 0 };
+const NO_EVENTS: Record<ResultBasis, number> = { leaderboard: 0, standings: 0 };
 
 /**
  * Every named Player's Consistency and Low rounds, as of a day. Takes every Player's rows at
@@ -286,7 +286,7 @@ export function deriveRoundStrengths(
       strength: name,
       value,
       sampleSize: measures.events,
-      byBasis: { ...EVENTS_ONLY, leaderboard: measures.events },
+      byBasis: { ...NO_EVENTS, leaderboard: measures.events },
       tournamentIds: measures.tournamentIds,
       derivation,
     };
