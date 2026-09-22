@@ -39,4 +39,11 @@ describe("extractCourseName", () => {
     const multi = `{{Infobox golf tournament\n| course = [[Bay Hill Club]]<br>[[Isleworth Golf and Country Club|Isleworth]]\n}}`;
     expect(extractCourseName(multi)).toBe("Bay Hill Club, Isleworth");
   });
+
+  it("collapses a non-breaking space, and repeated or trailing whitespace", () => {
+    // The literal U+00A0 character, as it reaches this function once wikipedia.ts has
+    // decoded the "&nbsp;" entity MediaWiki's response carried.
+    const nbsp = `{{Infobox golf tournament\n| course = TPC Toronto at Osprey Valley (North course)  \n}}`;
+    expect(extractCourseName(nbsp)).toBe("TPC Toronto at Osprey Valley (North course)");
+  });
 });

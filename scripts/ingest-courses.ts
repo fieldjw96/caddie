@@ -86,9 +86,12 @@ async function main() {
     console.log(`\nMatched (${matched.length}):`);
     for (const { tournament, resolution } of matched) {
       if (resolution.status !== "matched") continue;
+      const dropped = resolution.qualifierDropped
+        ? ` (dropped "${resolution.qualifierDropped}")`
+        : "";
       console.log(
         `  ${tournament.name}: "${resolution.scheduleName}" -> ` +
-          `"${resolution.openGolfApiName}" [${resolution.confidence}]`,
+          `"${resolution.openGolfApiName}" [${resolution.confidence}]${dropped}`,
       );
     }
     listUnmatched(

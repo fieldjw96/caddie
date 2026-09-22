@@ -7,6 +7,7 @@ import {
   implausibleRecord,
   matchCourse,
   matchDeclared,
+  matchScheduledCourse,
   normaliseName,
   scheduledCourses,
   searchQueries,
@@ -205,6 +206,63 @@ describe("matchCourse", () => {
     expect(
       matchCourse("Renaissance Club", null, [course("r-ma", "Renaissance Golf Club", "MA")]),
     ).toMatchObject({ status: "near-miss", reason: /in MA, not outside the US/ });
+  });
+});
+
+describe("matchScheduledCourse", () => {
+  // The two real misses from a run on 2026-09-22 (see issue #30): both stored with the
+  // "&nbsp;" entity undecoded and a qualifier OpenGolfAPI does not itself distinguish.
+  // wikipedia.ts decodes the entity before this ever runs, so the schedule text here is
+  // already plain.
+
+  it("drops a parenthetical qualifier that reads as no candidate, and reports it", () => {
+    const host = scheduledCourses("TPC Toronto at Osprey Valley (North course)")[0]!;
+    const candidates = [course("tpc-t", "TPC Toronto at Osprey Valley", null)];
+
+    expect(matchScheduledCourse(host, null, candidates)).toMatchObject({
+      status: "matched",
+      confidence: "exact",
+      course: { id: "tpc-t" },
+      qualifierDropped: "North course",
+    });
+  });
+
+  it("drops a qualifier preceded by a stray comma, and reports it", () => {
+    const host = scheduledCourses("Detroit Golf Club, (North Course)")[0]!;
+    const candidates = [course("det", "Detroit Golf Club", "MI")];
+
+    expect(matchScheduledCourse(host, "MI", candidates)).toMatchObject({
+      status: "matched",
+      confidence: "exact",
+      course: { id: "det" },
+      qualifierDropped: "North Course",
+    });
+  });
+
+  it("prefers the qualified name when a candidate reads as it, over the base club", () => {
+    const host = scheduledCourses("Detroit Golf Club, (North Course)")[0]!;
+    const candidates = [
+      course("det-n", "Detroit Golf Club North Course", "MI"),
+      course("det-s", "Detroit Golf Club South Course", "MI"),
+    ];
+
+    const result = matchScheduledCourse(host, "MI", candidates);
+    expect(result).toMatchObject({ status: "matched", course: { id: "det-n" } });
+    expect(result).not.toHaveProperty("qualifierDropped");
+  });
+
+  it("is unchanged for a name with no entity and no qualifier", () => {
+    const host = scheduledCourses("Waialae Country Club")[0]!;
+    const candidates = [course("w", "Waialae Country Club", "HI")];
+
+    const result = matchScheduledCourse(host, "HI", candidates);
+    expect(result).toEqual(matchCourse("Waialae Country Club", "HI", candidates));
+    expect(result).not.toHaveProperty("qualifierDropped");
+  });
+
+  it("stays a near-miss when neither the qualified nor the base name is found", () => {
+    const host = scheduledCourses("Nowhere Club (North course)")[0]!;
+    expect(matchScheduledCourse(host, null, [])).toMatchObject({ status: "near-miss" });
   });
 });
 
