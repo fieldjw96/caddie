@@ -110,7 +110,10 @@ code and not the schema, and the paragraph above is what makes that safe.
 `.github/workflows/smoke.yml` keeps its hourly schedule but will stop being triggered by
 `deployment_status`, because a CLI deploy reports no deployment status to GitHub. The deploy's
 own last step runs the same check, so a deployment is still smoke checked the moment it is
-made; the hourly run is what catches a production that breaks without a deploy.
+made; the hourly run is what catches a production that breaks without a deploy. A deploy that
+goes out broken therefore opens two issues, one from each workflow: the deploy's names the
+merge that did it, the hourly one tracks whether production is still failing and closes itself
+when it is not. Two is better than the nothing that started this.
 
 `drizzle-kit migrate` exits non-zero when a migration fails, which is all the ordering needs.
 Its progress display, however, swallows the Postgres error, so a failed migration step names

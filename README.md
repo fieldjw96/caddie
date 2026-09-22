@@ -161,9 +161,9 @@ stops push builds, and **disconnecting the Git integration in the Vercel project
 a human step this repository cannot do or verify**. Until somebody does it, Vercel may still
 build a push and race the migration, which is the failure the workflow exists to end.
 
-It reads one secret and two identifiers, all of them on the `production` GitHub Environment
-rather than the repository, so only a job that names that environment, on `main`, can have
-them. None of them goes in a file: this repository is public.
+It reads two secrets and two identifiers, all four on the `production` GitHub Environment
+rather than on the repository, so only a job that names that environment, on `main`, can have
+them. Neither secret goes in a file: this repository is public.
 
 | Name                       | What                                                                    | Where it comes from                                                                                    |
 | -------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
