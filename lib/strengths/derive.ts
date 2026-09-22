@@ -184,7 +184,9 @@ function strengthOf(
     (a, b) => a - b,
   );
   const value =
-    sampleSize >= MINIMUM_SAMPLE ? scored.reduce((sum, s) => sum + s.score, 0) / sampleSize : null;
+    sampleSize >= MINIMUM_SAMPLE
+      ? scored.reduce((sum, s) => sum + s.score, 0) / sampleSize
+      : null;
 
   const counted =
     `${sampleSize} usable result${sampleSize === 1 ? "" : "s"} ` +
