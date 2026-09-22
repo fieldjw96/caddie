@@ -130,7 +130,7 @@ export const courses = pgTable(
     wikidataId: text("wikidata_id"),
     openGolfApiId: text("opengolfapi_id"),
     par: integer("par"),
-    /** The course's own published total, from the longest tee. Not the sum of the holes. */
+    /** The course's own published total, as its Source states it. Not the sum of the holes. */
     publishedYardage: integer("published_yardage"),
     architect: text("architect"),
     tees: jsonb("tees").$type<CourseTee[]>(),

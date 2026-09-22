@@ -28,8 +28,9 @@ describe("courseResponse", () => {
   });
 
   it("fails naming the field when one goes missing", () => {
-    const { yardage: _, ...changed } = clone(augusta);
-    expect(() => parse(courseResponse, changed, "GET course")).toThrow(/yardage/);
+    const changed: Partial<typeof augusta> = clone(augusta);
+    delete changed.yardage;
+    expect(() => parse(courseResponse, changed, "GET course")).toThrow(/^.*\. yardage:/);
   });
 
   it("names every failing field, not just the first", () => {

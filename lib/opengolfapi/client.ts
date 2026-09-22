@@ -86,6 +86,8 @@ export class OpenGolfApiClient {
       throw new RequestError(url, error instanceof Error ? error.message : String(error));
     }
 
+    // Advisory: the budget above is the guarantee. A header that is missing or unreadable
+    // leaves the last reading in place rather than failing a response whose body is fine.
     const remaining = response.headers.get("x-ratelimit-remaining");
     if (remaining !== null) {
       const parsed = remainingHeader.safeParse(remaining);
