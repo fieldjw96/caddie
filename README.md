@@ -33,6 +33,11 @@ about 16 of the 500 requests a day OpenGolfAPI allows:
     npm run db:migrate
     npm run ingest:courses
 
+Course Traits, derived from the courses just ingested into `course_traits`. Idempotent, and
+refuses any Trait built on hole yardages for a course whose `holes_trusted` is false:
+
+    npm run derive:course-traits
+
 Checks, which are what CI runs:
 
     npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build
