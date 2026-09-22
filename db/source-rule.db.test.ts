@@ -29,7 +29,9 @@ let tournamentId = 0;
 /** A row for each table that is valid in everything except its provenance. */
 const bodies: Record<string, () => Row> = {
   players: () => ({ wikidata_id: `Q${unique()}`, name: "A Player" }),
-  courses: () => ({ name: `Course ${unique()}` }),
+  // Attributed, so that an `opengolfapi` row is refused for its provenance and not for the
+  // ODbL attribution courses_opengolfapi_is_attributed also demands.
+  courses: () => ({ name: `Course ${unique()}`, attribution: "A Source's attribution" }),
   tournaments: () => ({
     name: `Tournament ${unique()}`,
     season: 2026,

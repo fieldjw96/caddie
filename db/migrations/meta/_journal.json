@@ -8,6 +8,13 @@
       "when": 1790044966817,
       "tag": "0000_source_rule",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790046822543,
+      "tag": "0001_course_facts",
+      "breakpoints": true
     }
   ]
 }
