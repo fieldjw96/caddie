@@ -7,10 +7,16 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { courses, tournaments } from "../../db/schema";
 import type { CoursePlan, CourseRow } from "./ingest";
 
-type Database = PgDatabase<PgQueryResultHKT>;
+// Generic over schema: called with db/migration-client.ts's schema-attached db from
+// scripts/ingest-courses.ts, and with a schema-less one from store.db.test.ts. Cares only that
+// it can run a query, not which connection or whether it carries a schema.
+type Database<TSchema extends Record<string, unknown>> = PgDatabase<PgQueryResultHKT, TSchema>;
 
 /** Upserts one course and returns its `courses.id`. */
-export async function storeCourse(db: Database, row: CourseRow): Promise<number> {
+export async function storeCourse<TSchema extends Record<string, unknown>>(
+  db: Database<TSchema>,
+  row: CourseRow,
+): Promise<number> {
   const [stored] = await db
     .insert(courses)
     .values(row)
@@ -27,7 +33,10 @@ export async function storeCourse(db: Database, row: CourseRow): Promise<number>
  * each set to its match or to null. A Tournament that matched last time and does not now is
  * cleared rather than left pointing at a match this run could not repeat.
  */
-export async function storePlan(db: Database, plan: CoursePlan): Promise<void> {
+export async function storePlan<TSchema extends Record<string, unknown>>(
+  db: Database<TSchema>,
+  plan: CoursePlan,
+): Promise<void> {
   await db.transaction(async (tx) => {
     const idByOpenGolfApiId = new Map<string, number>();
     for (const row of plan.rows) {

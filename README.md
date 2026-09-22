@@ -78,7 +78,7 @@ The page, at `/`, reads all of the above from the database at request time: the 
 Tournament, its Course Profile, the roster ordered by Fit Score, and what is not known.
 With no upcoming Tournament stored it says so rather than showing an empty ranking.
 
-In production the app and the scripts above want *different* connection strings, and neither
+In production the app and the scripts above want _different_ connection strings, and neither
 has a default. The app (`db/client.ts`) needs Supabase's pooled connection, since a serverless
 function opens and drops connections constantly and would exhaust a direct one; migrations and
 every ingest and derive script (`db/migration-client.ts`, `drizzle.config.ts`) need the direct,

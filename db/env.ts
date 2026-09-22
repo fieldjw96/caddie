@@ -30,7 +30,9 @@ export function resolveAppDatabaseUrl(): string {
  */
 export function resolveMigrationDatabaseUrl(): string {
   const url =
-    process.env.POSTGRES_URL_NON_POOLING ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+    process.env.POSTGRES_URL_NON_POOLING ??
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_URL;
   if (!url) {
     throw new Error(
       "No database connection string set. Looked for POSTGRES_URL_NON_POOLING, DATABASE_URL, " +

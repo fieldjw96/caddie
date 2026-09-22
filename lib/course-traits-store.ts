@@ -9,8 +9,12 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { courseTraits } from "../db/schema";
 import type { DerivedCourseTrait } from "./course-traits";
 
-export async function storeCourseTraits(
-  db: PgDatabase<PgQueryResultHKT>,
+// Generic over schema: called with db/migration-client.ts's schema-attached db from
+// scripts/derive-course-traits.ts, and with a schema-less one from
+// course-traits-store.db.test.ts. Cares only that it can run a query, not which connection or
+// whether it carries a schema.
+export async function storeCourseTraits<TSchema extends Record<string, unknown>>(
+  db: PgDatabase<PgQueryResultHKT, TSchema>,
   courseId: number,
   traits: DerivedCourseTrait[],
 ): Promise<void> {
