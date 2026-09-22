@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { FIT_TRAITS, TRAIT_SCALES } from "../lib/fit";
 import { fitTraits } from "../lib/page/data";
 import { PLAYERS, TRUSTED_TRAITS } from "../lib/page/fixtures";
 import { Ranking } from "./ranking";
@@ -47,8 +48,9 @@ describe("Ranking", () => {
     expect(order()).toEqual(["Blair Baker", "Casey Clark"]);
     expect(scoreOf("Blair Baker")).not.toBe(before);
     expect(scoreOf("Blair Baker")).toContain("+0.600");
-    // Adams has no Form, and the par 5 share, which calls for Form, is now the only Trait that
-    // counts: nothing known is left, so Adams moves to the no-record section, not the bottom.
+    // Adams has no Low rounds, and the par 5 share, which calls for Low rounds, is now the only
+    // Trait that counts: nothing known is left, so Adams moves to the no-record section, not the
+    // bottom. Adams's strong Form does not save a place: Form is in no Trait.
     expect(within(noRecordSection()).getByText(/Alex Adams/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Back to the declared Weightings" }));
@@ -66,6 +68,22 @@ describe("Ranking", () => {
     for (const cell of adams?.querySelectorAll("td") ?? []) {
       expect(cell.textContent?.trim()).not.toBe("");
     }
+  });
+
+  it("says which Strength each Weighting calls for, and why, not Skill for all of them", () => {
+    renderRanking();
+    const section = screen.getByRole("region", { name: "The Weightings" });
+    const text = section.textContent ?? "";
+    expect(text).toContain("Calls for Consistency.");
+    expect(text).toContain("Calls for Low rounds.");
+    expect(text.match(/Calls for Skill\./g)).toHaveLength(3);
+    for (const trait of FIT_TRAITS) expect(text).toContain(TRAIT_SCALES[trait].why);
+  });
+
+  it("shows Form beside the Fit Score without counting it", () => {
+    renderRanking();
+    expect(within(row("Alex Adams")!).getByText("99%")).toBeTruthy();
+    expect(screen.getByText(/shown beside the Fit Score, not counted in it/)).toBeTruthy();
   });
 
   it("puts a Player with no Fit Score in a section of its own, not the ranking", () => {

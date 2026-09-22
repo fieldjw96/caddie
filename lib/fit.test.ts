@@ -115,13 +115,47 @@ const NOT_SUITING: FitCourseTraits = {
   longest_par_4_yards: 460,
   par_5_share: 2 / 18,
 };
-const STRONG: FitPlayerStrengths = { skill: 0.8, form: 0.75 };
+const STRONG: FitPlayerStrengths = { skill: 0.8, consistency: 0.75, low_rounds: 0.75 };
+
+describe("which Strength each Trait calls for", () => {
+  it("does not map every Trait to the same Strength", () => {
+    const called = new Set(FIT_TRAITS.map((t) => TRAIT_SCALES[t].calls));
+    expect(called.size).toBeGreaterThan(1);
+  });
+
+  it("has at least two Traits calling for something other than Skill", () => {
+    const notSkill = FIT_TRAITS.filter((t) => TRAIT_SCALES[t].calls !== "skill");
+    expect(notSkill.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("declares the mapping, and a reason for each Trait the page can print", () => {
+    expect(Object.fromEntries(FIT_TRAITS.map((t) => [t, TRAIT_SCALES[t].calls]))).toEqual({
+      length_yards: "skill",
+      slope_rating_gap: "consistency",
+      mean_par_4_yards: "skill",
+      longest_par_4_yards: "skill",
+      par_5_share: "low_rounds",
+    });
+    for (const trait of FIT_TRAITS) expect(TRAIT_SCALES[trait].why.trim(), trait).not.toBe("");
+  });
+
+  it("scores Players with the same Skill differently where the Course asks for a kind of game", () => {
+    const steady = { skill: 0.7, consistency: 0.9, low_rounds: 0.2 };
+    const streaky = { skill: 0.7, consistency: 0.2, low_rounds: 0.9 };
+    const penal: FitCourseTraits = { slope_rating_gap: 80, par_5_share: 2 / 18 };
+    const scoring: FitCourseTraits = { slope_rating_gap: 60, par_5_share: 5 / 18 };
+    expect(fitScore(penal, steady).score!).toBeGreaterThan(fitScore(penal, streaky).score!);
+    expect(fitScore(scoring, streaky).score!).toBeGreaterThan(
+      fitScore(scoring, steady).score!,
+    );
+  });
+});
 
 describe("fitScore", () => {
   it("scores a strong Player well at a Course that suits them", () => {
     const fit = fitScore(SUITING, STRONG);
     // Every Trait at the top of its range: the score is the weighted edge, all of it known.
-    expect(fit.score).toBeCloseTo(0.8 * 0.6 + 0.2 * 0.5, 12);
+    expect(fit.score).toBeCloseTo(0.55 * 0.6 + 0.25 * 0.5 + 0.2 * 0.5, 12);
     expect(fit.knownWeight).toBeCloseTo(1, 12);
     expect(fit.totalWeight).toBeCloseTo(1, 12);
   });
@@ -156,20 +190,20 @@ describe("fitScore", () => {
   });
 
   it("gives a null Strength a null contribution, never zero", () => {
-    const fit = fitScore(SUITING, { skill: 0.8, form: null });
+    const fit = fitScore(SUITING, { skill: 0.8, low_rounds: null });
     const par5 = fit.components.find((c) => c.trait === "par_5_share")!;
     expect(par5.strengthValue).toBeNull();
     expect(par5.edge).toBeNull();
     expect(par5.contribution).toBeNull();
     expect(par5.contribution).not.toBe(0);
     // And it is not scored as a zero Strength, which would be the worst finish possible.
-    const asZero = fitScore(SUITING, { skill: 0.8, form: 0 });
+    const asZero = fitScore(SUITING, { skill: 0.8, low_rounds: 0 });
     expect(asZero.components.find((c) => c.trait === "par_5_share")!.contribution).toBe(-0.2);
     expect(fit.score).not.toBe(asZero.score);
   });
 
   it("scores a Player with partial Strengths on what is known, and says how much that is", () => {
-    const fit = fitScore(SUITING, { skill: null, form: 0.75 });
+    const fit = fitScore(SUITING, { skill: null, low_rounds: 0.75 });
     expect(fit.score).toBeCloseTo(0.2 * 1 * 0.5, 12);
     expect(fit.knownWeight).toBeCloseTo(0.2, 12);
     expect(fit.totalWeight).toBeCloseTo(1, 12);
@@ -180,7 +214,10 @@ describe("fitScore", () => {
   });
 
   it("gives a Player with no Strengths a null Fit Score, not zero", () => {
-    for (const none of [{}, { skill: null, form: null }] as FitPlayerStrengths[]) {
+    for (const none of [
+      {},
+      { skill: null, consistency: null, low_rounds: null },
+    ] as FitPlayerStrengths[]) {
       const fit = fitScore(SUITING, none);
       expect(fit.score).toBeNull();
       expect(fit.knownWeight).toBe(0);
@@ -201,7 +238,7 @@ describe("fitScore", () => {
     }
     expect(fit.knownWeight).toBeCloseTo(0.55, 12);
     expect(fit.score).toBeCloseTo(
-      0.3 * ((7_445 - 6_900) / 900) * 0.6 + 0.25 * ((71.8 - 60) / 20) * 0.6,
+      0.3 * ((7_445 - 6_900) / 900) * 0.6 + 0.25 * ((71.8 - 60) / 20) * 0.5,
       12,
     );
     // A null Trait is the same as an absent one.
@@ -221,7 +258,7 @@ describe("fitScore", () => {
       par_5_share: 0,
     };
     expect(fitScore(SUITING, STRONG, lengthOnly).score).toBeCloseTo(0.6, 12);
-    expect(fitScore(SUITING, STRONG).score).toBeCloseTo(0.58, 12);
+    expect(fitScore(SUITING, STRONG).score).toBeCloseTo(0.555, 12);
   });
 
   it("refuses Weightings and Strengths it cannot mean anything by", () => {
@@ -237,7 +274,10 @@ describe("fitScore", () => {
 describe("rankFits", () => {
   it("ranks the scored highest first and keeps the unscored apart, not at the bottom", () => {
     const players = [
-      { player: "weak", fit: fitScore(SUITING, { skill: 0.3, form: 0.3 }) },
+      {
+        player: "weak",
+        fit: fitScore(SUITING, { skill: 0.3, consistency: 0.3, low_rounds: 0.3 }),
+      },
       { player: "unknown", fit: fitScore(SUITING, {}) },
       { player: "strong", fit: fitScore(SUITING, STRONG) },
     ];
@@ -271,7 +311,11 @@ function generated(random: () => number) {
   const weightings = Object.fromEntries(
     FIT_TRAITS.map((t) => [t, random() < 0.1 ? 0 : random() * 3]),
   ) as Record<FitTraitName, number>;
-  const player = (): FitPlayerStrengths => ({ skill: maybe(random()), form: maybe(random()) });
+  const player = (): FitPlayerStrengths => ({
+    skill: maybe(random()),
+    consistency: maybe(random()),
+    low_rounds: maybe(random()),
+  });
   return { traits, weightings, a: player(), b: player() };
 }
 

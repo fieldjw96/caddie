@@ -63,7 +63,13 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
           .where(eq(courseTraits.courseId, courseRow.id));
 
   const venueKey = courseRow === null ? null : strengthKey("venue_record", courseRow.id);
-  const keys = ["skill", "form", ...(venueKey === null ? [] : [venueKey])];
+  const keys = [
+    "skill",
+    "consistency",
+    "low_rounds",
+    "form",
+    ...(venueKey === null ? [] : [venueKey]),
+  ];
   const [playerRows, strengthRows] = await Promise.all([
     db.select({ id: players.id, name: players.name, country: players.country }).from(players),
     db
@@ -149,6 +155,8 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
         name: p.name,
         country: p.country,
         skill: get(p.id, "skill"),
+        consistency: get(p.id, "consistency"),
+        lowRounds: get(p.id, "low_rounds"),
         form: get(p.id, "form"),
         venueRecord: get(p.id, venueKey),
       })),

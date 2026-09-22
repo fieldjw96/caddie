@@ -1,17 +1,18 @@
 // Reads the stored results Strengths are derived from, and replaces the stored Strengths with
-// freshly derived ones. The derivation itself is lib/strengths/derive.ts, which touches
-// neither this nor any database.
+// freshly derived ones. The derivations themselves are lib/strengths/derive.ts and
+// lib/strengths/rounds.ts, which touch neither this nor any database.
 
 import { eq } from "drizzle-orm";
 import type { db as dbClient } from "../../db/client";
 import { playerStrengths, results, tournaments } from "../../db/schema";
-import type { PlayerStrengths, StoredResult } from "./derive";
+import type { PlayerStrengths } from "./derive";
+import type { RoundedResult, RoundStrengths } from "./rounds";
 
 type Database = typeof dbClient;
 
-/** Every stored result, joined to the Tournament it was in. */
-export async function loadResults(database: Database): Promise<StoredResult[]> {
-  return database
+/** Every stored result, with its round scores, joined to the Tournament it was in. */
+export async function loadResults(database: Database): Promise<RoundedResult[]> {
+  const rows = await database
     .select({
       playerId: results.playerId,
       tournamentId: results.tournamentId,
@@ -20,9 +21,17 @@ export async function loadResults(database: Database): Promise<StoredResult[]> {
       basis: results.basis,
       finish: results.finish,
       position: results.position,
+      round1: results.round1,
+      round2: results.round2,
+      round3: results.round3,
+      round4: results.round4,
     })
     .from(results)
     .innerJoin(tournaments, eq(results.tournamentId, tournaments.id));
+  return rows.map(({ round1, round2, round3, round4, ...row }) => ({
+    ...row,
+    rounds: [round1, round2, round3, round4],
+  }));
 }
 
 /** The `strength` key a Strength is stored under. A venue record is keyed by its Course. */
@@ -46,10 +55,18 @@ export interface StrengthRecord {
 export function strengthRecords(
   derived: ReadonlyMap<number, PlayerStrengths>,
   courseId: number | null,
+  fromRounds: ReadonlyMap<number, RoundStrengths> = new Map(),
 ): StrengthRecord[] {
   const records: StrengthRecord[] = [];
   for (const [playerId, strengths] of derived) {
-    for (const s of [strengths.skill, strengths.form, strengths.venueRecord]) {
+    const rounds = fromRounds.get(playerId);
+    for (const s of [
+      strengths.skill,
+      strengths.form,
+      strengths.venueRecord,
+      rounds?.consistency ?? null,
+      rounds?.lowRounds ?? null,
+    ]) {
       if (s === null) continue;
       records.push({
         playerId,

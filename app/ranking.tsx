@@ -15,6 +15,7 @@ import {
   rankFits,
   type FitComponent,
   type FitCourseTraits,
+  type FitStrengthName,
   type FitTraitName,
   type Weightings,
 } from "../lib/fit";
@@ -28,7 +29,11 @@ export const TRAIT_LABELS: Readonly<Record<FitTraitName, string>> = {
   par_5_share: "Par 5 share",
 };
 
-const STRENGTH_LABELS = { skill: "Skill", form: "Form" } as const;
+export const STRENGTH_LABELS: Readonly<Record<FitStrengthName, string>> = {
+  skill: "Skill",
+  consistency: "Consistency",
+  low_rounds: "Low rounds",
+};
 
 function formatRangeEnd(trait: FitTraitName, value: number): string {
   if (trait === "par_5_share") return `${Math.round(value * 18)} of 18`;
@@ -105,7 +110,11 @@ export function Ranking({
         player,
         fit: fitScore(
           traits,
-          { skill: player.skill?.value ?? null, form: player.form?.value ?? null },
+          {
+            skill: player.skill?.value ?? null,
+            consistency: player.consistency?.value ?? null,
+            low_rounds: player.lowRounds?.value ?? null,
+          },
           deferred,
         ),
       })),
@@ -134,8 +143,11 @@ export function Ranking({
           Each Trait&rsquo;s contribution is its Weighting, times how much this Course asks for
           the Strength it calls for, times the Player&rsquo;s edge in that Strength over the
           middle of the field. The Fit Score is their sum, between −{totalWeight.toFixed(2)}{" "}
-          and +{totalWeight.toFixed(2)} on the current Weightings. Skill and Form are the share
-          of the field a Player finished ahead of, with the number of results beneath.
+          and +{totalWeight.toFixed(2)} on the current Weightings. Skill is the share of the
+          field a Player finished ahead of. Consistency is how little their rounds swing
+          against each day&rsquo;s field, and Low rounds how often one of their rounds is in
+          the lowest tenth of it, each as the share of the other Players with a value they
+          beat. Beneath each is the number of events it rests on.
         </p>
 
         {ranked.scored.length === 0 ? (
@@ -145,7 +157,7 @@ export function Ranking({
           </p>
         ) : (
           <div className="mt-4 max-h-[36rem] overflow-auto rounded border border-rule">
-            <table className="w-full min-w-[56rem] border-collapse text-sm">
+            <table className="w-full min-w-[68rem] border-collapse text-sm">
               <thead className="sticky top-0 bg-panel text-xs text-muted">
                 <tr>
                   <th scope="col" className="px-2 py-2 text-right font-medium">
@@ -161,13 +173,19 @@ export function Ranking({
                     Skill
                   </th>
                   <th scope="col" className="px-2 py-2 text-right font-medium">
-                    Form
+                    Consistency
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Low rounds
                   </th>
                   {FIT_TRAITS.map((t) => (
                     <th key={t} scope="col" className="px-2 py-2 text-right font-medium">
                       {TRAIT_LABELS[t]}
                     </th>
                   ))}
+                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                    Form
+                  </th>
                   {hasVenue && (
                     <th scope="col" className="px-2 py-2 text-right font-medium">
                       Record here
@@ -203,10 +221,12 @@ export function Ranking({
                       </span>
                     </td>
                     <StrengthCell strength={player.skill} />
-                    <StrengthCell strength={player.form} />
+                    <StrengthCell strength={player.consistency} />
+                    <StrengthCell strength={player.lowRounds} />
                     {fit.components.map((c) => (
                       <ContributionCell key={c.trait} component={c} />
                     ))}
+                    <StrengthCell strength={player.form} />
                     {hasVenue && <StrengthCell strength={player.venueRecord} />}
                   </tr>
                 ))}
@@ -214,10 +234,11 @@ export function Ranking({
             </table>
           </div>
         )}
-        {hasVenue && ranked.scored.length > 0 && (
-          <p className="mt-2 text-xs text-muted">
-            Record here is the same measure over a Player&rsquo;s results at this Course. It is
-            shown beside the Fit Score, not counted in it.
+        {ranked.scored.length > 0 && (
+          <p className="mt-2 max-w-prose text-xs text-muted">
+            {hasVenue
+              ? "Form is Skill’s measure over the last six months, and Record here the same over a Player’s results at this Course. Both say how well a Player has done, not whose game suits this Course, so they are shown beside the Fit Score, not counted in it."
+              : "Form is Skill’s measure over the last six months. It says how well a Player has done lately, not whose game suits this Course, so it is shown beside the Fit Score, not counted in it."}
           </p>
         )}
       </section>
@@ -261,9 +282,12 @@ export function Ranking({
                   }
                   className="mt-2 w-full"
                 />
+                <p className="mt-1 text-sm">
+                  <strong>Calls for {STRENGTH_LABELS[scale.calls]}.</strong> {scale.why}
+                </p>
                 <p className="mt-1 text-xs text-muted">
-                  Calls for {STRENGTH_LABELS[scale.calls]}. Scaled from{" "}
-                  {formatRangeEnd(trait, scale.min)} to {formatRangeEnd(trait, scale.max)};{" "}
+                  Scaled from {formatRangeEnd(trait, scale.min)} to{" "}
+                  {formatRangeEnd(trait, scale.max)};{" "}
                   {asks === null
                     ? "unknown for this Course, so it counts for nobody."
                     : `this Course asks ${asks.toFixed(2)} of 1.`}{" "}
