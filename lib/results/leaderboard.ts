@@ -11,8 +11,9 @@
 // hyphen typed for its equals sign, `71-67-71-70-279`, is a typo in the Source, and every
 // fresh article has had one or two. It costs that line its round scores, which are stored as
 // null and reported, and not its finish, which is read from its own cell. Every other failure
-// still costs the whole leaderboard, as does more than MAXIMUM_DOUBTFUL_SCORES such typos:
-// that many is a table this parser is misreading, not an editor's slip.
+// still costs the whole leaderboard, as do more than one such typo in LINES_PER_DOUBTFUL_SCORE
+// lines: that many is a table this parser is misreading, not an editor's slip. A Player who
+// withdrew before finishing a round has an empty score cell, or a dash, and no rounds.
 
 import { z } from "zod";
 import { finishSchema, stripCellMarkup } from "./finish";
@@ -25,8 +26,14 @@ const MINIMUM_ENTRIES = 30;
 
 const ROUNDS = 4;
 
-/** More score cells than this that read as scores and do not add up is a misread table. */
-export const MAXIMUM_DOUBTFUL_SCORES = 3;
+/**
+ * More than one line in this many with a score cell that reads as scores and does not add up
+ * is a misread table. The 2026 Open, fresh, had six in 156 lines, all of them plain slips.
+ */
+export const LINES_PER_DOUBTFUL_SCORE = 20;
+
+/** A score cell with nothing in it, as printed for a withdrawal before any round was done. */
+const NO_SCORE = /^[-–—]?$/;
 
 /** A cell made of two- and three-digit numbers and the separators between them, and no more. */
 const SCORE_LIKE = /^[0-9]{2,3}(?:s*[-–=]s*[0-9]{2,3}){0,5}$/;
@@ -156,6 +163,11 @@ export function readLeaderboard(articleWikitext: string): Leaderboard {
       let rounds: Rounds | null = null;
       if (score.success) {
         rounds = score.data;
+      } else if (
+        parsed.data.place.position === null &&
+        NO_SCORE.test(stripCellMarkup(scoreCell))
+      ) {
+        rounds = [null, null, null, null];
       } else if (SCORE_LIKE.test(stripCellMarkup(scoreCell))) {
         doubtfulScores.push(
           `line ${line} (${label}), "${stripCellMarkup(scoreCell)}": ${score.error.issues[0]?.message}; finish kept, rounds not stored`,
@@ -175,10 +187,11 @@ export function readLeaderboard(articleWikitext: string): Leaderboard {
     }
   }
 
-  if (doubtfulScores.length > MAXIMUM_DOUBTFUL_SCORES) {
+  if (doubtfulScores.length * LINES_PER_DOUBTFUL_SCORE > entries.length) {
     throw new Error(
-      `The leaderboard has ${doubtfulScores.length} score cells that do not add up, more than the ` +
-        `${MAXIMUM_DOUBTFUL_SCORES} typos a table this parser reads correctly would have: ${doubtfulScores.join("; ")}`,
+      `The leaderboard has ${doubtfulScores.length} score cells in ${entries.length} lines that do ` +
+        `not add up, more than the one in ${LINES_PER_DOUBTFUL_SCORE} a table this parser reads ` +
+        `correctly would have: ${doubtfulScores.join("; ")}`,
     );
   }
   if (entries.length < MINIMUM_ENTRIES) {
