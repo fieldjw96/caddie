@@ -4,6 +4,7 @@
 
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { STRENGTH_MINIMUM_SAMPLE } from "./schema";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -56,6 +57,7 @@ const bodies: Record<string, () => Row> = {
     player_id: playerId,
     strength: `driving_${unique()}`,
     value: 0.5,
+    sample_size: 5,
   }),
 };
 
@@ -158,6 +160,27 @@ describe("player_strengths", () => {
     expect(
       await refusal("player_strengths", { ...bodies.player_strengths!(), ...ingested }),
     ).toBe("player_strengths_are_derived");
+  });
+
+  it("refuses a value resting on fewer results than the minimum sample", async () => {
+    expect(
+      await refusal("player_strengths", {
+        ...bodies.player_strengths!(),
+        sample_size: STRENGTH_MINIMUM_SAMPLE - 1,
+        ...derived,
+      }),
+    ).toBe("player_strengths_value_needs_minimum_sample");
+  });
+
+  it("stores no record as a null value with the sample it would have rested on", async () => {
+    const id = await insert("player_strengths", {
+      ...bodies.player_strengths!(),
+      value: null,
+      sample_size: STRENGTH_MINIMUM_SAMPLE - 1,
+      ...derived,
+    });
+    expect(id).toBeGreaterThan(0);
+    created.unshift(["player_strengths", id]);
   });
 });
 

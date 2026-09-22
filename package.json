@@ -20,7 +20,8 @@
     "db:migrate": "drizzle-kit migrate",
     "ingest:courses": "tsx scripts/ingest-courses.ts",
     "ingest:players": "tsx scripts/ingest-players.ts",
-    "ingest:results": "tsx scripts/ingest-results.ts"
+    "ingest:results": "tsx scripts/ingest-results.ts",
+    "derive:strengths": "tsx scripts/derive-strengths.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
