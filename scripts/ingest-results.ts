@@ -20,7 +20,7 @@
 // `npm run ingest:results -- 2025` reads one named season instead.
 
 import { inArray, max } from "drizzle-orm";
-import { client, db } from "../db/client";
+import { client, db } from "../db/migration-client";
 import { players, tournaments } from "../db/schema";
 import { buildResultRecords, ensureTournaments, upsertResults } from "../lib/results/ingest";
 import type { ResultRecord, SourcedEvent } from "../lib/results/ingest";

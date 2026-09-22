@@ -10,21 +10,12 @@
 // same reading twice writes the same row, and a fetch failure never overwrites an earlier
 // success.
 
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { client, db } from "../db/migration-client";
 import { courses } from "../db/schema";
 import { fetchCourseFacts } from "../lib/courses/wikipedia-ingest";
 import { storeCourseFacts } from "../lib/courses/wikipedia-store";
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  throw new Error("DATABASE_URL is not set. See .env.example.");
-}
-
 async function main(): Promise<void> {
-  const client = postgres(url!, { max: 1, onnotice: () => {} });
-  const db = drizzle(client);
-
   try {
     const stored = await db.select({ id: courses.id, name: courses.name }).from(courses);
     console.log(`Reading Wikipedia for ${stored.length} Courses.`);

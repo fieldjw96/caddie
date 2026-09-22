@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { sql } from "drizzle-orm";
-import { client, db } from "../db/client";
+import { client, db } from "../db/migration-client";
 import { players } from "../db/schema";
 import { sparqlResponseSchema, toPlayerRows } from "../lib/wikidata-players";
 

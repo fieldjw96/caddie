@@ -12,8 +12,7 @@
 // non-zero. Idempotent: a re-run upserts the same courses and sets the same matches.
 
 import { and, count, eq, inArray, isNotNull, max } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { client, db } from "../db/migration-client";
 import { courses, tournaments } from "../db/schema";
 import { OpenGolfApiClient } from "../lib/opengolfapi/client";
 import {
@@ -23,11 +22,6 @@ import {
   type TournamentOutcome,
 } from "../lib/opengolfapi/ingest";
 import { storePlan } from "../lib/opengolfapi/store";
-
-const url = process.env.DATABASE_URL;
-if (!url) {
-  throw new Error("DATABASE_URL is not set. See .env.example.");
-}
 
 function listUnmatched(title: string, outcomes: TournamentOutcome[]) {
   if (outcomes.length === 0) return;
@@ -43,8 +37,6 @@ function listUnmatched(title: string, outcomes: TournamentOutcome[]) {
 }
 
 async function main() {
-  const client = postgres(url!, { max: 1, onnotice: () => {} });
-  const db = drizzle(client);
   const api = new OpenGolfApiClient();
 
   try {

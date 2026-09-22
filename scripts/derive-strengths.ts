@@ -6,7 +6,7 @@
 //
 // `npm run derive:strengths -- 2026-06-01` derives as of a named day instead of today.
 
-import { client, db } from "../db/client";
+import { client, db } from "../db/migration-client";
 import { players, tournaments } from "../db/schema";
 import {
   deriveStrengths,
