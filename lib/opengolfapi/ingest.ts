@@ -1,4 +1,4 @@
-// From the schedule's Course names to `courses` rows: match each by name within its state,
+// From the schedule's Course names to `courses` rows: match each by name where it is played,
 // fetch each match, check its holes, map it. Nothing here touches the database, so all of it
 // can be tested from fixtures, and nothing is written until every request has been made.
 
@@ -81,8 +81,8 @@ export type ScheduledTournament = {
  *
  * - `matched`: one OpenGolfAPI course, its name, and how certain the match is.
  * - `near-miss`: search returned courses, and none of them could be chosen with certainty.
- * - `failed`: nothing to choose from, or no way to look: no name, no state, several courses
- *   named with none declared, or a request that failed.
+ * - `failed`: no way to look, or nothing usable found: no name, no Location, several courses
+ *   named with none declared, a request that failed, or a record no Tour course could have.
  */
 export type Resolution =
   | {
@@ -171,9 +171,11 @@ function lookupFor(courseName: string, location: string | null): Search | { reas
  * distinct Course name, then one fetch per distinct course. Nothing is stored; the caller
  * writes the plan in one go, or not at all.
  *
- * The requests still needed are checked against what remains before every search, at two per
- * search, and again before the fetches. A run that cannot finish throws RunStopped at the
- * first point it can tell, rather than spending requests on a plan it cannot complete.
+ * The requests still needed are checked against what remains before every search, at the most
+ * each search left could cost, and again before the fetches, at exactly one per course. A run
+ * that cannot finish throws RunStopped at the first point it can tell, rather than spending
+ * requests on a plan it cannot complete. The estimate errs high, so a run can be refused that
+ * would just have fitted; it cannot be let through that would not.
  */
 export async function planCourses(
   client: OpenGolfApiClient,

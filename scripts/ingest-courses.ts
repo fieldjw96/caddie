@@ -3,9 +3,9 @@
 // Tournament's `course_id` and `course_match`. Needs `ingest:schedule` first: the Course names
 // and Locations it matches are the ones that stored.
 //
-// A match is by name within the Tournament's state, and only when it is certain; anything
-// less is left null and listed at the end, with the name as the schedule wrote it. See
-// lib/courses/match.ts for the rules.
+// A match is by name, within the Tournament's state where it has one, and only when it is
+// certain; anything less is left null and listed at the end, with the name as the schedule
+// wrote it. See lib/courses/match.ts for the rules.
 //
 // Nothing is written until every request has been made. A run that would need more requests
 // than OpenGolfAPI has left today stops, says how far it got, writes nothing and exits
@@ -16,7 +16,12 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { courses, tournaments } from "../db/schema";
 import { OpenGolfApiClient } from "../lib/opengolfapi/client";
-import { planCourses, RunStopped, type TournamentOutcome } from "../lib/opengolfapi/ingest";
+import {
+  planCourses,
+  RunStopped,
+  type CoursePlan,
+  type TournamentOutcome,
+} from "../lib/opengolfapi/ingest";
 import { storePlan } from "../lib/opengolfapi/store";
 
 const url = process.env.DATABASE_URL;
@@ -65,7 +70,7 @@ async function main() {
       `Matching the ${season} season: ${scheduled.length} Tournaments, ${named} with a Course name.`,
     );
 
-    let plan;
+    let plan: CoursePlan;
     try {
       plan = await planCourses(api, scheduled);
     } catch (error) {
