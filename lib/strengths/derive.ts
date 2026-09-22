@@ -190,7 +190,7 @@ function strengthOf(
 
   const counted =
     `${sampleSize} usable result${sampleSize === 1 ? "" : "s"} ` +
-    `(${byBasis.leaderboard} from full-field leaderboards, ${byBasis.standings} from the FedEx Cup standings table)`;
+    `(${byBasis.leaderboard} from full-field leaderboards, ${byBasis.standings} from the FedEx Cup standings and playoffs tables)`;
   const from =
     tournamentIds.length > 0
       ? `, from Wikipedia results (CC BY-SA 4.0) at tournaments ${tournamentIds.map((id) => `#${id}`).join(", ")}`

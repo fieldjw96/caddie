@@ -56,7 +56,7 @@ export interface CoverageView {
   seasons: number[];
   /** Events with a full-field leaderboard. */
   leaderboardEvents: string[];
-  /** Events read only from the FedEx Cup standings table's top 30. */
+  /** Events read only from the FedEx Cup standings' top 30 or the playoffs' qualifiers. */
   standingsEvents: string[];
 }
 
@@ -275,7 +275,7 @@ export function coverageSentences(coverage: CoverageView): string[] {
   }
   if (standingsEvents.length > 0) {
     sentences.push(
-      `Only the top 30 of the FedEx Cup standings, so only the finishes of Players who had a good season: ${listInWords(standingsEvents)}.`,
+      `Finishes only, from tables that list only Players who had a good season, the top 30 of the FedEx Cup standings or a playoff event's qualifiers: ${listInWords(standingsEvents)}.`,
     );
   }
   sentences.push(
