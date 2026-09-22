@@ -12,8 +12,15 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1790046934731,
-      "tag": "0001_add_tournament_course_name",
+      "when": 1790046924489,
+      "tag": "0001_players_country_and_turned_pro",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790048538481,
+      "tag": "0002_add_tournament_course_name",
       "breakpoints": true
     }
   ]
