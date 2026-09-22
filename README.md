@@ -74,21 +74,27 @@ ended up with nothing at all. `-- 2025-09-01` derives as of a named day instead 
 
     npm run derive:strengths
 
-The page, at `/`, reads all of the above from `DATABASE_URL` at request time: the next
+The page, at `/`, reads all of the above from the database at request time: the next
 Tournament, its Course Profile, the roster ordered by Fit Score, and what is not known.
 With no upcoming Tournament stored it says so rather than showing an empty ranking.
 
 ## Production
 
-Production needs one thing this repository cannot hold: a Postgres. Any provider will do; all
-that is asked of it is a connection string.
+The app and the ingest want _different_ connection strings, and neither has a default.
 
-- **The app refuses to start without it.** `db/client.ts` throws `DATABASE_URL is not set`
-  rather than fall back to anything, so a deploy with no database is a 500 on every request,
-  not an empty page. Set `DATABASE_URL` in the Vercel project to the same connection string.
+- **The app refuses to start without one.** `db/client.ts` resolves Supabase's pooled
+  connection — `DATABASE_URL`, then `POSTGRES_URL` — and throws naming both if neither is set,
+  so a deploy with no database is a 500 on every request, not an empty page. A serverless
+  function opens and drops connections constantly and would exhaust a direct one.
 - **The ingest writes to it from the repository secret `CADDIE_DATABASE_URL`**, and from
-  nothing else. Set it with `gh secret set CADDIE_DATABASE_URL`. It never goes in a file: this
-  repository is public.
+  nothing else. Set it with `gh secret set CADDIE_DATABASE_URL`, to the _direct_, non-pooling
+  connection string: migrations and every ingest and derive script
+  (`db/migration-client.ts`, `drizzle.config.ts`) need that one, since DDL and prepared
+  statements do not survive a transaction-mode pooler. It reaches the scripts as
+  `DATABASE_URL`, which `resolveMigrationDatabaseUrl()` accepts after `POSTGRES_URL_NON_POOLING`.
+  It never goes in a file: this repository is public.
+
+See `db/env.ts` and `.env.example` for every variable name each side resolves, in order.
 
 [`.github/workflows/ingest.yml`](.github/workflows/ingest.yml) populates it, daily and by hand
 from the Actions tab: migrations first, then every ingest above in dependency order, one step

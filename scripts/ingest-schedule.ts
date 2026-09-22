@@ -2,7 +2,7 @@
 // writes one `tournaments` row per event. See docs/adr/0002 for what this source was checked
 // to hold, and the "Ingest the PGA Tour schedule" Ticket for what this script must do.
 
-import { client, db } from "../db/client";
+import { client, db } from "../db/migration-client";
 import {
   buildTournamentRecords,
   resolveCourseNames,

@@ -7,16 +7,10 @@
 // run did not produce for that course, so a course whose holes_trusted has since turned false
 // does not keep stale hole-derived rows behind it.
 
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { client, db } from "../db/migration-client";
 import { courses } from "../db/schema";
 import { deriveCourseTraits } from "../lib/course-traits";
 import { storeCourseTraits } from "../lib/course-traits-store";
-
-const url = process.env.DATABASE_URL;
-if (!url) {
-  throw new Error("DATABASE_URL is not set. See .env.example.");
-}
 
 function trustNote(holesTrusted: boolean | null): string {
   if (holesTrusted === true) return "trusted holes";
@@ -25,9 +19,6 @@ function trustNote(holesTrusted: boolean | null): string {
 }
 
 async function main(): Promise<void> {
-  const client = postgres(url!, { max: 1, onnotice: () => {} });
-  const db = drizzle(client);
-
   try {
     const rows = await db.select().from(courses);
     let traitCount = 0;

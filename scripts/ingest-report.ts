@@ -5,7 +5,7 @@
 
 import { appendFileSync } from "node:fs";
 import { and, count, countDistinct, desc, eq, isNotNull } from "drizzle-orm";
-import { client, db } from "../db/client";
+import { client, db } from "../db/migration-client";
 import {
   courses,
   courseTraits,

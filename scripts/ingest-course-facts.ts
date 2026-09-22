@@ -19,17 +19,13 @@
 // overwrites an earlier success.
 
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { client, db } from "../db/migration-client";
 import { courses, tournaments } from "../db/schema";
 import { fetchCourseFacts, type CourseToRead } from "../lib/courses/wikipedia-ingest";
 import { wikipediaFacilityName } from "../lib/courses/wikipedia-name";
 import { storeCourseFacts } from "../lib/courses/wikipedia-store";
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  throw new Error("DATABASE_URL is not set. See .env.example.");
-}
+type MigrationDb = typeof db;
 
 /**
  * Every stored Course, with the Wikipedia-native facility name resolved from whichever of its
@@ -37,7 +33,7 @@ if (!url) {
  * can be matched to it across seasons; the first recorded is as good a choice as any, since a
  * Course's own name does not change under it.
  */
-async function coursesToRead(db: ReturnType<typeof drizzle>): Promise<CourseToRead[]> {
+async function coursesToRead(db: MigrationDb): Promise<CourseToRead[]> {
   const rows = await db
     .select({
       id: courses.id,
@@ -62,9 +58,6 @@ async function coursesToRead(db: ReturnType<typeof drizzle>): Promise<CourseToRe
 }
 
 async function main(): Promise<void> {
-  const client = postgres(url!, { max: 1, onnotice: () => {} });
-  const db = drizzle(client);
-
   try {
     const stored = await coursesToRead(db);
     console.log(`Reading Wikipedia for ${stored.length} Courses.`);

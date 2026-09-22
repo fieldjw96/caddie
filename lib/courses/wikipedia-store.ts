@@ -6,7 +6,10 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { courses } from "../../db/schema";
 import type { CourseFactsOutcome } from "./wikipedia-ingest";
 
-type Database = PgDatabase<PgQueryResultHKT>;
+// Generic over schema: called with db/migration-client.ts's schema-attached db from
+// scripts/ingest-course-facts.ts, and with a schema-less one from wikipedia-store.db.test.ts.
+// Cares only that it can run a query, not which connection or whether it carries a schema.
+type Database<TSchema extends Record<string, unknown>> = PgDatabase<PgQueryResultHKT, TSchema>;
 
 /**
  * A fact this run did not find is stored null, with its source_url null alongside it, exactly
@@ -14,8 +17,8 @@ type Database = PgDatabase<PgQueryResultHKT>;
  * read this run (`no-article`) is left as it was: a fetch failure says nothing about whether
  * a fact stored by an earlier run still holds, so nothing here overwrites it with null.
  */
-export async function storeCourseFacts(
-  db: Database,
+export async function storeCourseFacts<TSchema extends Record<string, unknown>>(
+  db: Database<TSchema>,
   outcome: CourseFactsOutcome,
 ): Promise<void> {
   if (outcome.status !== "read") return;
