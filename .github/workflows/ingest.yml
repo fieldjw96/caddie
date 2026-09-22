@@ -35,17 +35,18 @@ permissions:
   contents: read
 
 jobs:
-  # The same job that runs on every push to main, before any stage. The migrate stage below
-  # then finds nothing left to apply. It stays in so the stages still run as one sequence from
-  # nothing, locally too. Both run `npm run db:migrate` over the same db/migrations, so this
-  # ingest and the migrate workflow cannot disagree about the schema, and if production's
+  # Migrations before any stage. Usually there is nothing left to apply, because deploy.yml
+  # migrated each merge as it happened, but this ingest does not assume that: the migrate
+  # stage below stays in too, so the stages still run as one sequence from nothing, locally
+  # too. All three run `npm run db:migrate` over the same db/migrations, applying only what
+  # the database has not seen, so they cannot disagree about the schema, and if production's
   # migration fails, no stage writes.
   migrate:
     uses: ./.github/workflows/migrate.yml
     # A reusable workflow called with `uses:` receives none of the caller's secrets unless they
     # are passed. Without this the migrate job runs, reaches its own connection check, and
     # reports POSTGRES_URL_NON_POOLING as unset even though it is set on the production
-    # environment and the very same job succeeds when it runs standalone on push. Proven both
+    # environment and the very same job succeeds when it runs on its own. Proven both
     # ways: run 35781367155 failed here while run 35776303632, the same job by itself with the
     # same secret, passed its check and applied the migrations.
     secrets: inherit

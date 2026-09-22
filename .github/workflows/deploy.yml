@@ -1,0 +1,295 @@
+# Merging to `main` applies pending migrations to production and then deploys, in that order,
+# as steps of one job. Nothing else deploys this repo automatically: Vercel's Git integration
+# is disconnected in the dashboard and `vercel.json` turns its push builds off as well, because
+# a push-triggered build races the migration. See docs/adr/0003 and the README.
+#
+# The ordering guarantee is plain step semantics: a failed step skips every step after it
+# unless that step says otherwise, and only the failure report does. A failed migration
+# therefore means no deploy. A cancelled run, including one stopped by `timeout-minutes`, skips
+# them the same way and is reported the same way. lib/deploy/workflow.test.ts asserts that and
+# every other property below, so a later edit that breaks one fails CI rather than production.
+#
+# `main` only, three ways, any one of which is enough:
+#   1. the only trigger is a push to `main`;
+#   2. the job's `if:` repeats that exactly, so a trigger added later still runs nothing;
+#   3. the job runs in the `production` GitHub Environment. Its secrets live there, and that
+#      environment's deployment branches are restricted to `main`, so GitHub will not hand
+#      them to a job from any other ref. That includes a workflow a pull request adds of its
+#      own, which neither 1 nor 2 can stop, since it would not be this file.
+#
+# And the tip of `main` only. None of the three stops a re-run of an older run, which keeps its
+# original commit, workflow file and ref. So the job checks its commit is still `origin/main`
+# before it touches a secret, and again just before it deploys.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Two merges close together must not interleave: the second run's migration landing while the
+# first is mid-deploy. A run in progress is never cancelled, because cancelling between
+# migrating and deploying leaves the schema and the running code disagreeing with nothing
+# left to reconcile them. GitHub does drop a queued run when a newer one arrives, which is
+# harmless: the newer commit contains the older one.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  deploy:
+    name: Migrate and deploy to production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      # Which Vercel project to act on. Identifiers, not credentials, so they may sit at job
+      # level. With these set the CLI needs no `vercel link`, and so no account-level read:
+      # VERCEL_TOKEN is scoped to this one project, and `vercel whoami` and `vercel link` both
+      # fail with "User not found" under such a token, because it cannot see its own owner.
+      # They are variables of the `production` environment rather than literals in this file
+      # only because nothing in a public repo should name an account's internals needlessly.
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    # No secret sits at job level. `npm ci` runs dependencies' install scripts, and those have
+    # no business seeing one. Each secret is handed to the one step that needs its value, and
+    # VERCEL_TOKEN's value is handed only to the step that deploys: the preflight below is
+    # given `secrets.VERCEL_TOKEN != ''`, which is the boolean `true` or `false` and never the
+    # token, so a missing token still fails loudly before anything touches production.
+    steps:
+      - id: checkout
+        name: Check out main
+        uses: actions/checkout@v6
+        with:
+          # This repo is public, so the tip-of-main check below fetches without credentials.
+          persist-credentials: false
+
+      - id: setup_node
+        name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - id: install
+        name: Install dependencies
+        run: npm ci
+
+      # Not a devDependency of this repo: the CLI's own tree carries a standing pile of high
+      # and critical advisories, and `npm audit --audit-level=high` in CI would fail on all of
+      # them, on every pull request, for a tool the app never imports. Installed here instead,
+      # pinned to an exact version, into a directory outside the project, by a step that holds
+      # no secret. Not `npx vercel@...` in the deploy step: npx pins only the top-level package
+      # and resolves the rest at run time, which would run their install scripts inside the one
+      # step that holds VERCEL_TOKEN.
+      - id: cli
+        name: Install the Vercel CLI
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/vercel-cli" vercel@59.25.4
+          "$RUNNER_TEMP/vercel-cli/node_modules/.bin/vercel" --version
+
+      # A GitHub re-run keeps the original commit, workflow file and ref, so the job's `if:`
+      # still passes. Drizzle would then apply nothing, since it only applies what the database
+      # has not seen, and `vercel deploy --prod` would ship the old code behind the newer
+      # schema: a rollback nobody chose. First, before any step that holds a secret, so a stale
+      # run cannot reach production at all.
+      - id: tip_before_migrate
+        name: Check this commit is still the tip of main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          main_sha=$(git rev-parse refs/remotes/origin/main)
+          if [ "$main_sha" != "$GITHUB_SHA" ]; then
+            echo "::error title=Not the tip of main::This run is for $GITHUB_SHA, but origin/main is $main_sha. Refusing to ship a commit main has moved past; to redeploy, re-run the Deploy run for $main_sha instead."
+            exit 1
+          fi
+          echo "origin/main is $GITHUB_SHA, this run's commit."
+
+      # A missing credential is a first-class state, not a crash halfway through. Everything
+      # this job needs is checked here, before the migration, so an unset secret costs a red
+      # run that names it and changes nothing. Each message says how to set what is missing.
+      # It says whether a value is set and whether it looks pooled, never what it is.
+      - id: preflight
+        name: Check the production secrets and identifiers
+        env:
+          DATABASE_URL: ${{ secrets.POSTGRES_URL_NON_POOLING }}
+          # The boolean, not the token. Nothing here can print a credential it never holds.
+          HAS_VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          failed=""
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error title=No production database::The production environment's secret POSTGRES_URL_NON_POOLING is not set. Set it with: gh secret set POSTGRES_URL_NON_POOLING --env production"
+            failed=yes
+          else
+            case "$DATABASE_URL" in
+              *pgbouncer=true* | *:6543/*)
+                echo "::error title=Pooled connection::POSTGRES_URL_NON_POOLING looks like a transaction-mode pooler (port 6543 or pgbouncer=true). Migrations need the direct connection."
+                failed=yes
+                ;;
+            esac
+          fi
+
+          if [ "$HAS_VERCEL_TOKEN" != "true" ]; then
+            echo "::error title=No Vercel token::The production environment's secret VERCEL_TOKEN is not set. Create a project-scoped token at https://vercel.com/account/tokens and set it with: gh secret set VERCEL_TOKEN --env production"
+            failed=yes
+          fi
+
+          # Identifiers, so they may be named in a log: knowing them grants nothing.
+          if [ -z "$VERCEL_ORG_ID" ]; then
+            echo "::error title=No Vercel org::The production environment's variable VERCEL_ORG_ID is not set. It is the orgId in .vercel/project.json after a local 'vercel link'. Set it with: gh variable set VERCEL_ORG_ID --env production"
+            failed=yes
+          fi
+          if [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::error title=No Vercel project::The production environment's variable VERCEL_PROJECT_ID is not set. It is the projectId in .vercel/project.json after a local 'vercel link'. Set it with: gh variable set VERCEL_PROJECT_ID --env production"
+            failed=yes
+          fi
+
+          if [ -n "$failed" ]; then
+            echo "::error title=Deploy not configured::Production is not configured to deploy from Actions. Nothing was migrated and nothing was deployed. The errors above name each missing piece."
+            exit 1
+          fi
+          echo "Every production secret and identifier is present, and the connection is direct."
+
+      # The same migration the daily ingest runs, over the same db/migrations, applying only
+      # what the database has not seen. Schema first because the other order is the broken one:
+      # code that reads a table the database lacks fails every request, while a schema one
+      # merge ahead of the running code is what an additive migration is written to tolerate.
+      #
+      # drizzle-kit exits non-zero when a migration fails, which is all the ordering needs, but
+      # its progress display swallows the Postgres error itself. A red step here with no reason
+      # in the log is expected: reproduce with `npm run db:migrate` against a copy.
+      - id: migrate
+        name: Apply pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.POSTGRES_URL_NON_POOLING }}
+        run: npm run db:migrate
+
+      # The same check again, now that the migration has taken time. It is the one step between
+      # migrating and deploying, deliberately: it holds no secret and is the only thing that
+      # can fail there. If main has moved, this commit's schema is applied but not its code,
+      # and the run for the newer commit, queued behind this one by the concurrency group,
+      # migrates and deploys that.
+      - id: tip_before_deploy
+        name: Check main has not moved since the migration
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          main_sha=$(git rev-parse refs/remotes/origin/main)
+          if [ "$main_sha" != "$GITHUB_SHA" ]; then
+            echo "::error title=Not the tip of main::This run is for $GITHUB_SHA, but origin/main is $main_sha. Refusing to ship a commit main has moved past; to redeploy, re-run the Deploy run for $main_sha instead."
+            exit 1
+          fi
+          echo "origin/main is $GITHUB_SHA, this run's commit."
+
+      # `--prod` waits for the build and for the production domain to be moved onto the new
+      # deployment before it exits, so the smoke check below reaches this deployment and not
+      # the previous one. The CLI reads VERCEL_TOKEN from the environment, so the token never
+      # appears on a command line, and the two identifiers from the job's env, so there is
+      # nothing to link. The deployment's own URL is printed and not used: what has to work is
+      # the address readers use, which is what the smoke check asks.
+      - id: deploy
+        name: Deploy to Vercel production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          url=$("$RUNNER_TEMP/vercel-cli/node_modules/.bin/vercel" deploy --prod --yes)
+          echo "Deployed $url."
+
+      # A deploy that succeeds and serves a 500 is the failure this whole ticket exists for, so
+      # it fails the run. The same check .github/workflows/smoke.yml runs hourly, against the
+      # address in lib/production.ts and no other: scripts/smoke.ts takes no argument, so
+      # nothing here can pass by checking something that is not production.
+      - id: smoke
+        name: Smoke check production
+        env:
+          SMOKE_REPORT: ${{ runner.temp }}/smoke-report.md
+        run: npm run smoke
+
+      # A broken deploy arrives in the same queue as every other piece of work, not as silence
+      # on a dashboard nobody opens. That silence is what let production serve stale code for
+      # three and a half hours on 2026-09-22. While an issue from an earlier failure is still
+      # open, a repeat failure comments on it rather than opening a second.
+      #
+      # `cancelled()` as well as `failure()`: `timeout-minutes` cancels the job rather than
+      # failing it, and a Vercel call that hangs after the migration has applied is exactly the
+      # run that must not be silent. The step it stopped in has the outcome `cancelled`.
+      #
+      # A job GitHub never starts, the environment refusing it say, reaches no step and so
+      # opens nothing; that shows as a red run on the commit.
+      - id: report
+        name: Open an issue for the failure
+        if: failure() || cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          REPORT: ${{ runner.temp }}/smoke-report.md
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Every step above appears here; the test fails if one is left out.
+          FAILED_STEP: >-
+            ${{
+            (steps.checkout.outcome == 'failure' || steps.checkout.outcome == 'cancelled') && 'Check out main' ||
+            (steps.setup_node.outcome == 'failure' || steps.setup_node.outcome == 'cancelled') && 'Set up Node' ||
+            (steps.install.outcome == 'failure' || steps.install.outcome == 'cancelled') && 'Install dependencies' ||
+            (steps.cli.outcome == 'failure' || steps.cli.outcome == 'cancelled') && 'Install the Vercel CLI' ||
+            (steps.tip_before_migrate.outcome == 'failure' || steps.tip_before_migrate.outcome == 'cancelled') && 'Check this commit is still the tip of main' ||
+            (steps.preflight.outcome == 'failure' || steps.preflight.outcome == 'cancelled') && 'Check the production secrets and identifiers' ||
+            (steps.migrate.outcome == 'failure' || steps.migrate.outcome == 'cancelled') && 'Apply pending migrations' ||
+            (steps.tip_before_deploy.outcome == 'failure' || steps.tip_before_deploy.outcome == 'cancelled') && 'Check main has not moved since the migration' ||
+            (steps.deploy.outcome == 'failure' || steps.deploy.outcome == 'cancelled') && 'Deploy to Vercel production' ||
+            (steps.smoke.outcome == 'failure' || steps.smoke.outcome == 'cancelled') && 'Smoke check production' ||
+            'an unidentified step'
+            }}
+        run: |
+          set -euo pipefail
+          prefix="Deploy to production failed"
+          body="$RUNNER_TEMP/deploy-failure.md"
+
+          if [ "$JOB_STATUS" = "cancelled" ]; then
+            what="was cancelled, by the job's 30-minute timeout or by hand, while"
+          else
+            what="failed"
+          fi
+
+          {
+            printf 'The **%s** step %s deploying `%s` from `main`.\n\n' "$FAILED_STEP" "$what" "$GITHUB_SHA"
+            printf 'Run: %s\n\n' "$RUN_URL"
+            if [ -s "$REPORT" ]; then cat "$REPORT"; printf '\n'; fi
+            printf '%s\n' \
+              'Each step stops the ones after it. A failure up to and including *Apply pending' \
+              'migrations* deployed nothing, and production still serves the previous deployment.' \
+              'A failure after it leaves the schema ahead of the running code, which an additive' \
+              'migration is written to tolerate. A failed *Smoke check production* means the new' \
+              'deployment is live and broken; promoting the previous one in the Vercel dashboard' \
+              'is the rollback, and it rolls back the code and not the schema.' \
+              '' \
+              'Either *Check ... main* step failing is deliberate: this commit is no longer the' \
+              'tip of `main`, usually because this is a re-run of an older run, and shipping it' \
+              'would roll production back. The run for the newest commit deploys that one; to' \
+              'redeploy, re-run that run rather than this one.' \
+              '' \
+              'A failed migration shows no Postgres error in the log, because drizzle-kit hides' \
+              'it: reproduce with `npm run db:migrate` against a copy of production.'
+          } > "$body"
+
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 200 \
+                       --json number,title \
+                     | jq -r --arg prefix "$prefix" \
+                         '[.[] | select(.title | startswith($prefix))][0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+            echo "::error title=Deploy failed::Still failing. Updated issue #$existing."
+          else
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$prefix: $FAILED_STEP" \
+              --body-file "$body")
+            echo "::error title=Deploy failed::Opened $url"
+          fi

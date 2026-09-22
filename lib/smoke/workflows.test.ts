@@ -23,8 +23,10 @@ const secretsIn = (code: string) =>
 describe("the migrate workflow", () => {
   const code = workflow("migrate.yml");
 
-  it("runs on every push to main, by hand, and when another workflow calls it", () => {
-    expect(code).toMatch(/^ {2}push:\n {4}branches: \[main\]\n(?! {4}paths)/m);
+  it("runs by hand and when another workflow calls it, but not on a push", () => {
+    // A push to main is deploy.yml's, which migrates as the step before it deploys. A push
+    // trigger here would race it. lib/deploy/workflow.test.ts asserts the other half.
+    expect(code).not.toMatch(/^ {2}push:/m);
     expect(code).toMatch(/^ {2}workflow_dispatch:/m);
     expect(code).toMatch(/^ {2}workflow_call:/m);
   });
