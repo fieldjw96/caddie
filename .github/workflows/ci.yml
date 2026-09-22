@@ -29,6 +29,39 @@ jobs:
       - run: npm run test
       - run: npm run build
 
+  # The migration, applied from nothing to a scratch Postgres that exists only for this job,
+  # and then the proof that the database itself refuses a fact whose Source is unknown. No
+  # manual step runs before `db:migrate`: if the migration needs one, this job is where that
+  # shows. See ADR 0001 and db/schema.ts.
+  migrate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: caddie
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d caddie"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # A throwaway container's credentials, not a secret.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/caddie
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:migrate
+      - run: npm run test:db
+
   # ADR 0001 is the rule this repo exists under, and prose does not enforce it. This job
   # fails if a prohibited host appears anywhere in the tree, including in a test fixture or
   # a comment showing "the endpoint we must not call". Someone will eventually add one to be

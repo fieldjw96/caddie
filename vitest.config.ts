@@ -7,6 +7,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     include: ["**/*.test.ts", "**/*.test.tsx"],
-    exclude: ["node_modules/**", ".next/**"],
+    // Database tests need a migrated Postgres and run under vitest.db.config.ts instead.
+    exclude: ["node_modules/**", ".next/**", "**/*.db.test.ts"],
   },
 });
