@@ -57,10 +57,7 @@ describe("storeCourseTraits", () => {
     const traits = [trait(), trait({ trait: "par", value: 72, unit: "strokes" })];
 
     await storeCourseTraits(db, courseId, traits);
-    await storeCourseTraits(db, courseId, [
-      { ...traits[0]!, value: 7250 },
-      traits[1]!,
-    ]);
+    await storeCourseTraits(db, courseId, [{ ...traits[0]!, value: 7250 }, traits[1]!]);
 
     const stored = await db
       .select()

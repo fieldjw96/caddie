@@ -5,7 +5,12 @@ import type { CourseHole, CourseTee } from "../db/schema";
 import augusta from "./opengolfapi/fixtures/augusta-national.detail.json";
 import { toCourseRow } from "./opengolfapi/ingest";
 import { courseResponse, parse } from "./opengolfapi/schema";
-import { deriveCourseTraits, type CourseFacts } from "./course-traits";
+import {
+  deriveCourseTraits,
+  type CourseFacts,
+  type DerivedCourseTrait,
+} from "./course-traits";
+import type { CourseRow } from "./opengolfapi/ingest";
 
 const tee = (overrides: Partial<CourseTee> = {}): CourseTee => ({
   name: "Black",
@@ -43,8 +48,20 @@ function trustedCourse(overrides: Partial<CourseFacts> = {}): CourseFacts {
   };
 }
 
-const byTrait = (traits: { trait: string }[], name: string) =>
+const byTrait = (traits: DerivedCourseTrait[], name: string) =>
   traits.find((t) => t.trait === name);
+
+/** The insert-shaped row toCourseRow returns, narrowed to the facts a Trait can be built from. */
+function asCourseFacts(row: CourseRow): CourseFacts {
+  return {
+    par: row.par ?? null,
+    publishedYardage: row.publishedYardage ?? null,
+    tees: row.tees ?? null,
+    holes: row.holes ?? null,
+    holesCheckedTee: row.holesCheckedTee ?? null,
+    holesTrusted: row.holesTrusted ?? null,
+  };
+}
 
 describe("deriveCourseTraits", () => {
   it("derives every Trait for a course with trusted holes", () => {
@@ -67,12 +84,18 @@ describe("deriveCourseTraits", () => {
 
     expect(byTrait(traits, "length_yards")).toMatchObject({ value: 6970, unit: "yards" });
     expect(byTrait(traits, "par")).toMatchObject({ value: 72, unit: "strokes" });
-    expect(byTrait(traits, "slope_rating_gap")).toMatchObject({ value: 135 - 73.5, unit: "points" });
+    expect(byTrait(traits, "slope_rating_gap")).toMatchObject({
+      value: 135 - 73.5,
+      unit: "points",
+    });
     expect(byTrait(traits, "par_3_count")).toMatchObject({ value: 4, unit: "holes" });
     expect(byTrait(traits, "par_4_count")).toMatchObject({ value: 10, unit: "holes" });
     expect(byTrait(traits, "par_5_count")).toMatchObject({ value: 4, unit: "holes" });
     expect(byTrait(traits, "par_5_share")).toMatchObject({ value: 4 / 18, unit: "share" });
-    expect(byTrait(traits, "longest_par_4_yards")).toMatchObject({ value: 450, unit: "yards" });
+    expect(byTrait(traits, "longest_par_4_yards")).toMatchObject({
+      value: 450,
+      unit: "yards",
+    });
     expect(byTrait(traits, "mean_par_4_yards")).toMatchObject({ value: 405, unit: "yards" });
 
     for (const t of traits) {
@@ -123,7 +146,7 @@ describe("deriveCourseTraits", () => {
     const row = toCourseRow(course, "attribution");
     expect(row.holesTrusted).toBe(false);
 
-    const traits = deriveCourseTraits(row);
+    const traits = deriveCourseTraits(asCourseFacts(row));
     const names = traits.map((t) => t.trait).sort();
     expect(names).toEqual(["length_yards", "par", "slope_rating_gap"].sort());
     expect(byTrait(traits, "length_yards")?.value).toBe(7445);
@@ -151,7 +174,12 @@ describe("deriveCourseTraits", () => {
       yardages: { black: 180 },
     }));
     const traits = deriveCourseTraits(
-      trustedCourse({ holes, publishedYardage: 3240, par: 54, tees: [tee({ yardage: 3240 })] }),
+      trustedCourse({
+        holes,
+        publishedYardage: 3240,
+        par: 54,
+        tees: [tee({ yardage: 3240 })],
+      }),
     );
 
     expect(byTrait(traits, "par_3_count")).toMatchObject({ value: 18 });

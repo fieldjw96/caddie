@@ -112,7 +112,9 @@ function courseLevelTraits(course: CourseFacts): DerivedCourseTrait[] {
         "slope_rating_gap",
         tee.slope - tee.rating,
         "points",
-        courseLevel(`courses.tees[name=${tee.name}].slope, courses.tees[name=${tee.name}].rating`),
+        courseLevel(
+          `courses.tees[name=${tee.name}].slope, courses.tees[name=${tee.name}].rating`,
+        ),
       ),
     );
   }
@@ -166,7 +168,9 @@ function holeDerivedTraits(course: CourseFacts): DerivedCourseTrait[] {
       const derivation = trustedHoles(
         `courses.holes[].yardages[${tee}] where courses.holes[].par = 4`,
       );
-      traits.push(makeTrait("longest_par_4_yards", Math.max(...yardages), "yards", derivation));
+      traits.push(
+        makeTrait("longest_par_4_yards", Math.max(...yardages), "yards", derivation),
+      );
       traits.push(
         makeTrait(
           "mean_par_4_yards",
