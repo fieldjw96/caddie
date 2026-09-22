@@ -8,6 +8,13 @@
       "when": 1790044966817,
       "tag": "0000_source_rule",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790046924489,
+      "tag": "0001_players_country_and_turned_pro",
+      "breakpoints": true
     }
   ]
 }
