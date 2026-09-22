@@ -1,74 +1,21 @@
-// From a course's name to a `courses` row: resolve it, fetch it, check its holes, map it.
-// Nothing here touches the database, so all of it can be tested from fixtures.
+// From the schedule's Course names to `courses` rows: match each by name within its state,
+// fetch each match, check its holes, map it. Nothing here touches the database, so all of it
+// can be tested from fixtures, and nothing is written until every request has been made.
 
-import type { CourseHole, CourseTee, courses } from "../../db/schema";
+import type { CourseHole, CourseMatch, CourseTee, courses } from "../../db/schema";
+import {
+  declaredFor,
+  matchCourse,
+  matchDeclared,
+  scheduledCourses,
+  searchQuery,
+  stateCode,
+  type Candidate,
+  type MatchResult,
+} from "../courses/match";
 import { OPENGOLFAPI_BASE_URL, RateLimitExhausted, type OpenGolfApiClient } from "./client";
 import { checkHoles } from "./holes";
 import { courseResponse, searchResponse, type CourseResponse } from "./schema";
-
-/**
- * A course to resolve by name. Search is fuzzy and returns neighbours: "Bay Hill" finds six
- * courses in four states, "Riviera" ten. So a Venue names the query, and then the exact name
- * and state the right result must have. Resolution accepts exactly one match and refuses
- * anything else, rather than guessing.
- */
-export type Venue = {
-  /** The query sent to search. */
-  query: string;
-  /** OpenGolfAPI's `course_name` for the right result, compared ignoring case and spacing. */
-  name: string;
-  /** Two-letter state, sent as a filter and checked on the result. */
-  state?: string;
-};
-
-/**
- * The PGA venues this Ticket was written against. Where a club has several courses, this is
- * the one the Tour plays: the Stadium courses at Sawgrass and Scottsdale, the South at Torrey
- * Pines, the Championship at Bay Hill.
- */
-export const VENUES: Venue[] = [
-  { query: "Augusta National", name: "Augusta National Golf Club", state: "GA" },
-  { query: "TPC Sawgrass", name: "Tpc Sawgrass The Players Stadium Course", state: "FL" },
-  { query: "Pebble Beach", name: "Pebble Beach Golf Links", state: "CA" },
-  { query: "Torrey Pines", name: "Torrey Pines South Course", state: "CA" },
-  { query: "Bay Hill", name: "Bay Hill Club Lodge Championship Course", state: "FL" },
-  { query: "Muirfield Village", name: "Muirfield Village Golf Club", state: "OH" },
-  { query: "TPC Scottsdale", name: "Tpc Scottsdale The Stadium Course", state: "AZ" },
-  { query: "Riviera", name: "The Riviera Country Club", state: "CA" },
-];
-
-/** A course that could not be resolved to exactly one OpenGolfAPI record. */
-export class ResolutionError extends Error {
-  constructor(venue: Venue, detail: string) {
-    super(`"${venue.query}" did not resolve to one course named "${venue.name}": ${detail}`);
-    this.name = "ResolutionError";
-  }
-}
-
-const normalise = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
-
-export type Resolved = { id: string; attribution: string };
-
-export async function resolve(client: OpenGolfApiClient, venue: Venue): Promise<Resolved> {
-  const params = new URLSearchParams({ q: venue.query });
-  if (venue.state) params.set("state", venue.state);
-  const found = await client.get(`/v1/courses/search?${params}`, searchResponse);
-
-  const matches = found.courses.filter(
-    (c) =>
-      normalise(c.course_name) === normalise(venue.name) &&
-      (venue.state === undefined || c.state === venue.state),
-  );
-  const [match, ...others] = matches;
-  if (!match) {
-    const names = found.courses.map((c) => `${c.course_name} (${c.state ?? "no state"})`);
-    throw new ResolutionError(venue, `search returned ${names.join(", ") || "nothing"}`);
-  }
-  if (others.length > 0) {
-    throw new ResolutionError(venue, `${matches.length} courses share that name and state`);
-  }
-  return { id: match.id, attribution: found._attribution };
-}
 
 export function sourceUrl(id: string): string {
   return `${OPENGOLFAPI_BASE_URL}/api/v1/courses/${encodeURIComponent(id)}`;
@@ -114,48 +61,227 @@ export function toCourseRow(course: CourseResponse, attribution: string): Course
   };
 }
 
-export type Outcome =
-  { venue: Venue; ok: true; row: CourseRow } | { venue: Venue; ok: false; error: string };
+/** One Tournament of the season being matched, as `tournaments` stores it. */
+export type ScheduledTournament = {
+  id: number;
+  name: string;
+  courseName: string | null;
+  location: string | null;
+};
 
 /**
- * Fetches and stores each Venue in turn. A course that fails, whether by resolution, request
- * or changed shape, becomes a failed Outcome and the run moves on to the next. The one
- * exception is RateLimitExhausted, which is thrown: every later request would fail the same
- * way, so going on would only spend the failures.
+ * What became of one schedule Course name. Every one carries the name as the schedule wrote
+ * it, so the report lists what is missing in words a person can look up.
+ *
+ * - `matched`: one OpenGolfAPI course, its name, and how certain the match is.
+ * - `near-miss`: search returned courses, and none of them could be chosen with certainty.
+ * - `failed`: nothing to choose from, or no way to look: no name, no state, several courses
+ *   named with none declared, or a request that failed.
  */
-export async function ingestVenues(
-  client: OpenGolfApiClient,
-  venues: Venue[],
-  store: (row: CourseRow) => Promise<void>,
-  report: (outcome: Outcome) => void = () => {},
-): Promise<Outcome[]> {
-  const outcomes: Outcome[] = [];
-  for (const venue of venues) {
-    let outcome: Outcome;
-    try {
-      const row = await fetchCourse(client, venue);
-      await store(row);
-      outcome = { venue, ok: true, row };
-    } catch (error) {
-      if (error instanceof RateLimitExhausted) throw error;
-      outcome = {
-        venue,
-        ok: false,
-        error: error instanceof Error ? error.message : `${error}`,
-      };
+export type Resolution =
+  | {
+      status: "matched";
+      scheduleName: string;
+      confidence: CourseMatch;
+      openGolfApiId: string;
+      openGolfApiName: string;
     }
-    outcomes.push(outcome);
-    report(outcome);
+  | { status: "near-miss"; scheduleName: string; reason: string; candidates: string[] }
+  | { status: "failed"; scheduleName: string | null; reason: string };
+
+export type TournamentOutcome = { tournament: ScheduledTournament; resolution: Resolution };
+
+export type CoursePlan = {
+  outcomes: TournamentOutcome[];
+  /** One row per matched OpenGolfAPI course, however many Tournaments are played on it. */
+  rows: CourseRow[];
+};
+
+/**
+ * The run ran out of requests part way. Nothing has been written, and the message says how
+ * far it got, so a re-run tomorrow starts from the same place rather than a half-filled table.
+ */
+export class RunStopped extends Error {
+  constructor(progress: string, cause: RateLimitExhausted) {
+    super(`Stopped before writing anything, ${progress}. ${cause.message}`);
+    this.name = "RunStopped";
   }
-  return outcomes;
 }
 
-/** Resolves one Venue and fetches its full record: two requests. */
-export async function fetchCourse(
-  client: OpenGolfApiClient,
-  venue: Venue,
-): Promise<CourseRow> {
-  const { id, attribution } = await resolve(client, venue);
-  const course = await client.get(`/api/v1/courses/${encodeURIComponent(id)}`, courseResponse);
-  return toCourseRow(course, attribution);
+const MAX_CANDIDATES_REPORTED = 6;
+
+const described = (c: Candidate) => `${c.course_name} (${c.state ?? "no state"})`;
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : `${error}`);
+
+type Search = {
+  query: string;
+  state: string;
+  match: (found: Candidate[]) => MatchResult;
+};
+
+/** What to search for a schedule name, or why it cannot be searched for. */
+function lookupFor(courseName: string, location: string | null): Search | { reason: string } {
+  const declared = declaredFor(courseName);
+  if (declared) {
+    return {
+      query: declared.query,
+      state: declared.state,
+      match: (found) => matchDeclared(declared, found),
+    };
+  }
+  const listed = scheduledCourses(courseName);
+  const [host, ...others] = listed;
+  if (!host) return { reason: "the schedule's Course name is empty" };
+  if (others.length > 0) {
+    return {
+      reason:
+        `it lists ${listed.length} courses (${listed.join("; ")}), and which one the ` +
+        "Tournament is played on has not been declared",
+    };
+  }
+  const state = stateCode(location);
+  if (!state) {
+    return { reason: `its Location, ${location ?? "none"}, is not a US state to search within` };
+  }
+  return {
+    query: searchQuery(host),
+    state,
+    match: (found) => matchCourse(host, state, found),
+  };
 }
+
+/**
+ * Matches every Tournament's Course and fetches every matched course's record: one search per
+ * distinct Course name, then one fetch per distinct course. Nothing is stored; the caller
+ * writes the plan in one go, or not at all.
+ *
+ * The requests still needed are checked against what remains before every search, at two per
+ * search, and again before the fetches. A run that cannot finish throws RunStopped at the
+ * first point it can tell, rather than spending requests on a plan it cannot complete.
+ */
+export async function planCourses(
+  client: OpenGolfApiClient,
+  tournaments: readonly ScheduledTournament[],
+): Promise<CoursePlan> {
+  const resolutions = new Map<string, Resolution>();
+  const keyOf = (t: ScheduledTournament) => JSON.stringify([t.courseName, t.location]);
+
+  const searches: { key: string; courseName: string; search: Search }[] = [];
+  for (const t of tournaments) {
+    const key = keyOf(t);
+    if (resolutions.has(key) || searches.some((s) => s.key === key)) continue;
+    if (t.courseName === null) {
+      resolutions.set(key, {
+        status: "failed",
+        scheduleName: null,
+        reason: "the schedule names no Course",
+      });
+      continue;
+    }
+    const lookup = lookupFor(t.courseName, t.location);
+    if ("reason" in lookup) {
+      resolutions.set(key, {
+        status: "failed",
+        scheduleName: t.courseName,
+        reason: lookup.reason,
+      });
+    } else {
+      searches.push({ key, courseName: t.courseName, search: lookup });
+    }
+  }
+
+  let attribution: string | null = null;
+  let searched = 0;
+  try {
+    for (const { key, courseName, search } of searches) {
+      // Two for each search left, this one included: the search, and its course's record.
+      client.ensure(2 * (searches.length - searched));
+      try {
+        const params = new URLSearchParams({ q: search.query, state: search.state });
+        const found = await client.get(`/v1/courses/search?${params}`, searchResponse);
+        attribution = found._attribution;
+        const result = search.match(found.courses);
+        resolutions.set(
+          key,
+          result.status === "matched"
+            ? {
+                status: "matched",
+                scheduleName: courseName,
+                confidence: result.confidence,
+                openGolfApiId: result.course.id,
+                openGolfApiName: result.course.course_name,
+              }
+            : {
+                status: "near-miss",
+                scheduleName: courseName,
+                reason: result.reason,
+                candidates: result.candidates.slice(0, MAX_CANDIDATES_REPORTED).map(described),
+              },
+        );
+      } catch (error) {
+        if (error instanceof RateLimitExhausted) throw error;
+        resolutions.set(key, {
+          status: "failed",
+          scheduleName: courseName,
+          reason: messageOf(error),
+        });
+      }
+      searched += 1;
+    }
+  } catch (error) {
+    if (!(error instanceof RateLimitExhausted)) throw error;
+    throw new RunStopped(`having searched for ${searched} of ${searches.length} Courses`, error);
+  }
+
+  const ids = [
+    ...new Set(
+      [...resolutions.values()].flatMap((r) =>
+        r.status === "matched" ? [r.openGolfApiId] : [],
+      ),
+    ),
+  ];
+  const rows: CourseRow[] = [];
+  let fetched = 0;
+  try {
+    client.ensure(ids.length);
+    for (const id of ids) {
+      try {
+        const course = await client.get(
+          `/api/v1/courses/${encodeURIComponent(id)}`,
+          courseResponse,
+        );
+        // A match exists only after a search succeeded, so attribution has been read.
+        rows.push(toCourseRow(course, attribution!));
+      } catch (error) {
+        if (error instanceof RateLimitExhausted) throw error;
+        // A record that cannot be read costs every Tournament matched to it its match.
+        for (const [key, r] of resolutions) {
+          if (r.status === "matched" && r.openGolfApiId === id) {
+            resolutions.set(key, {
+              status: "failed",
+              scheduleName: r.scheduleName,
+              reason: `matched ${r.openGolfApiName}, whose record could not be read: ${messageOf(error)}`,
+            });
+          }
+        }
+      }
+      fetched += 1;
+    }
+  } catch (error) {
+    if (!(error instanceof RateLimitExhausted)) throw error;
+    throw new RunStopped(
+      `having searched for every Course and fetched ${fetched} of ${ids.length} records`,
+      error,
+    );
+  }
+
+  return {
+    outcomes: tournaments.map((tournament) => ({
+      tournament,
+      resolution: resolutions.get(keyOf(tournament))!,
+    })),
+    rows,
+  };
+}
+

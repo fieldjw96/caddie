@@ -74,6 +74,24 @@ export class OpenGolfApiClient {
     return this.sent;
   }
 
+  /** What the server last said is left today, or null before it has said anything. */
+  get remainingToday(): number | null {
+    return this.remaining;
+  }
+
+  /**
+   * Throws RateLimitExhausted unless `count` more requests can be sent, by this client's
+   * budget and by what the server last said remains. For a caller that would rather not start
+   * than stop halfway.
+   */
+  ensure(count: number): void {
+    const left = this.budget - this.sent;
+    const available = this.remaining === null ? left : Math.min(left, this.remaining);
+    if (available < count) {
+      throw new RateLimitExhausted(`${count} more requests are needed and ${available} remain`);
+    }
+  }
+
   /** Fetches `path` and parses its body with `schema`, or throws saying which field failed. */
   async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
     const url = `${OPENGOLFAPI_BASE_URL}${path}`;
