@@ -1,0 +1,21 @@
+# Paths worth a second look before they reach main. NOT a gate: see the warning below.
+#
+#   .github/workflows/  is the Gate itself. A Run that weakened claude-review.yml or ci.yml
+#                       would face no reviewer on the pull request after it.
+#   db/migrations/      is the least reversible thing here. A bad schema change cannot be
+#                       undone by reverting a commit.
+#   docs/adr/0001       is the licensing rule this whole repo exists under.
+#   CODEOWNERS          is this rule. It should not be editable by the thing it constrains.
+#
+# This file does not stop anything. The branch ruleset's only bypass actor is the admin role
+# the Runs act as, and a Run's pull request is authored by Jack, who cannot approve his own.
+# The review this file asks for is impossible rather than merely missing. See rolodeck-ai's
+# docs/adr/0017, which worked this out the hard way.
+#
+# What the file is for is flagging: a pull request touching one of these paths should say so
+# plainly in its body, because nothing else will.
+
+/.github/workflows/              @fieldjw96
+/db/migrations/                  @fieldjw96
+/docs/adr/0001-only-openly-licensed-data.md  @fieldjw96
+/.github/CODEOWNERS              @fieldjw96

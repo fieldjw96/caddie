@@ -1,0 +1,59 @@
+# The wall every Ticket clears before the review Gate is worth running. See CLAUDE.md's
+# "Definition of done". This repo merges on green with nobody looking, so this file is the
+# only thing that reads the code before it ships.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # A known-vulnerable dependency is a defect like any other. `high` and above only: a
+      # moderate advisory in a build-time tool is not worth blocking an unattended merge on,
+      # and a wall that cries wolf gets turned off.
+      - run: npm audit --audit-level=high
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test
+      - run: npm run build
+
+  # ADR 0001 is the rule this repo exists under, and prose does not enforce it. This job
+  # fails if a prohibited host appears anywhere in the tree, including in a test fixture or
+  # a comment showing "the endpoint we must not call". Someone will eventually add one to be
+  # helpful, and this is what catches it.
+  forbidden-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: No prohibited data source may be reachable from code
+        run: |
+          # pgatour.com Terms of Use 7C/7D/7H, and Disney's terms for ESPN. See docs/adr/0001.
+          #
+          # Source files only, deliberately. The rule ADR 0001 sets is about fetching, and
+          # only code fetches; prose that names a prohibited host is how the rule gets
+          # explained. Scanning everything failed this job on the ADR, the README and this
+          # very comment, which would have taught everyone to ignore the check.
+          if grep -rInE 'pgatour\.com|orchestrator\.pgatour|espn\.com|cbssports\.com' \
+               --include='*.ts' --include='*.tsx' \
+               --include='*.js' --include='*.mjs' --include='*.cjs' \
+               --include='*.json' --include='*.sql' \
+               --exclude-dir=.git \
+               --exclude-dir=node_modules \
+               --exclude=package-lock.json \
+               . ; then
+            echo "::error::A data source prohibited by ADR 0001 is reachable from code above. These hosts' terms forbid automated access and republication of their data. Remove it, or amend ADR 0001 in this same pull request."
+            exit 1
+          fi
+          echo "No prohibited source appears in any code file."
