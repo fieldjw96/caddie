@@ -44,6 +44,13 @@ of the 500 requests a day:
 
     npm run ingest:courses
 
+Altitude and green surface, from each Course's own Wikipedia article, added onto its
+`courses` row. Neither is reliably published: a Course whose article cannot be found, or whose
+infobox states neither field, is reported rather than treated as an error. Idempotent, and
+about a request a second:
+
+    npm run ingest:course-facts
+
 Course Traits, derived from the courses just ingested into `course_traits`. Idempotent, and
 refuses any Trait built on hole yardages for a course whose `holes_trusted` is false:
 
