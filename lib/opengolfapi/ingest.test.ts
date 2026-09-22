@@ -118,6 +118,34 @@ describe("planCourses", () => {
     });
   });
 
+  it("drops a parenthetical qualifier when no candidate reads as it, and reports it", async () => {
+    const { api } = client({
+      "q=tpc+toronto": {
+        body: search([
+          {
+            id: "tpc-t",
+            course_name: "TPC Toronto at Osprey Valley",
+            city: null,
+            state: null,
+          },
+        ]),
+      },
+      "/api/v1/courses/tpc-t": { body: { ...augusta, id: "tpc-t" } },
+    });
+    const plan = await planCourses(api, [
+      tournament(
+        "RBC Canadian Open",
+        "TPC Toronto at Osprey Valley (North course)",
+        "Ontario",
+      ),
+    ]);
+    expect(plan.outcomes[0]?.resolution).toMatchObject({
+      status: "matched",
+      openGolfApiId: "tpc-t",
+      qualifierDropped: "North course",
+    });
+  });
+
   it("reports, without a request, what it cannot search for", async () => {
     const { api, requested } = client({});
     const plan = await planCourses(api, [

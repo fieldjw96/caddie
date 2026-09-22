@@ -270,7 +270,17 @@ export function declaredFor(courseName: string): Declared | undefined {
 export type Candidate = { id: string; course_name: string; state: string | null };
 
 export type MatchResult =
-  | { status: "matched"; confidence: CourseMatch; course: Candidate }
+  | {
+      status: "matched";
+      confidence: CourseMatch;
+      course: Candidate;
+      /**
+       * Set when the match came from the bare club name, not the schedule's qualified one,
+       * because no candidate read as the qualified name: the parenthetical text that was
+       * dropped, such as "North course", so a caller can say so.
+       */
+      qualifierDropped?: string;
+    }
   | { status: "near-miss"; reason: string; candidates: Candidate[] };
 
 /**
@@ -359,6 +369,29 @@ export function matchCourse(
         : `no course in ${where} reads as this name`,
     candidates,
   };
+}
+
+/**
+ * A single scheduled course, matched preferring its qualified name — "TPC Toronto at Osprey
+ * Valley North course" — and falling back to the bare club name only when nothing reads as
+ * the qualified one. A venue that genuinely has several distinct courses on OpenGolfAPI is
+ * matched by the qualified name and never reaches the fallback, because that match succeeds
+ * on the first attempt; the fallback exists for the common case where OpenGolfAPI holds one
+ * record for the club and the schedule's parenthetical names a course within it that
+ * OpenGolfAPI does not distinguish. `scheduled.club` and `scheduled.name` are equal when the
+ * schedule wrote no qualifier at all, in which case this is exactly `matchCourse`.
+ */
+export function matchScheduledCourse(
+  scheduled: ScheduledCourse,
+  state: string | null,
+  candidates: Candidate[],
+  total: number = candidates.length,
+): MatchResult {
+  const qualified = matchCourse(scheduled.name, state, candidates, total);
+  if (scheduled.name === scheduled.club || qualified.status === "matched") return qualified;
+  const base = matchCourse(scheduled.club, state, candidates, total);
+  if (base.status !== "matched") return qualified;
+  return { ...base, qualifierDropped: scheduled.name.slice(scheduled.club.length).trim() };
 }
 
 /** The declared course among `candidates`, by its exact name and state, or why not. */

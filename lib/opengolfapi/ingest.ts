@@ -6,8 +6,8 @@ import type { CourseHole, CourseMatch, CourseTee, courses } from "../../db/schem
 import {
   declaredFor,
   implausibleRecord,
-  matchCourse,
   matchDeclared,
+  matchScheduledCourse,
   scheduledCourses,
   searchQueries,
   stateCode,
@@ -91,6 +91,8 @@ export type Resolution =
       confidence: CourseMatch;
       openGolfApiId: string;
       openGolfApiName: string;
+      /** The parenthetical qualifier dropped to reach this match, when one was. */
+      qualifierDropped?: string;
     }
   | { status: "near-miss"; scheduleName: string; reason: string; candidates: string[] }
   | { status: "failed"; scheduleName: string | null; reason: string };
@@ -162,7 +164,7 @@ function lookupFor(courseName: string, location: string | null): Search | { reas
   return {
     queries: searchQueries(host.club).slice(0, MAX_QUERIES),
     state,
-    match: (found, total) => matchCourse(host.name, state, found, total),
+    match: (found, total) => matchScheduledCourse(host, state, found, total),
   };
 }
 
@@ -233,6 +235,9 @@ export async function planCourses(
                 confidence: result.confidence,
                 openGolfApiId: result.course.id,
                 openGolfApiName: result.course.course_name,
+                ...(result.qualifierDropped !== undefined
+                  ? { qualifierDropped: result.qualifierDropped }
+                  : {}),
               }
             : {
                 status: "near-miss",

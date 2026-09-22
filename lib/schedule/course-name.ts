@@ -8,13 +8,18 @@
 const COURSE_FIELD = /\|[ \t]*course[ \t]*=[ \t]*([^\n]*)/i;
 
 function stripWikiMarkup(value: string): string {
-  return value
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/\[\[[^|\]]*\|([^\]]+)\]\]/g, "$1")
-    .replace(/\[\[([^\]]+)\]\]/g, "$1")
-    .replace(/'''?/g, "")
-    .replace(/<br\s*\/?>/gi, ", ")
-    .trim();
+  return (
+    value
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(/\[\[[^|\]]*\|([^\]]+)\]\]/g, "$1")
+      .replace(/\[\[([^\]]+)\]\]/g, "$1")
+      .replace(/'''?/g, "")
+      .replace(/<br\s*\/?>/gi, ", ")
+      // `\s` matches a non-breaking space along with the ordinary kind, so a name is what a
+      // person would type: one space between words, none at either end.
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /** The `course` field of a tournament article's `{{Infobox golf tournament}}`, as written. */
