@@ -1,31 +1,24 @@
-# Applies db/migrations to production whenever main changes, so a schema change reaches the
-# database with the code that reads it rather than at the next daily ingest, up to a day later.
+# Applies db/migrations to production, by hand from the Actions tab and as a reusable workflow
+# (`workflow_call`) so the daily ingest can run this same job as its first step. The ingest
+# also migrates first as its own first stage. Both run the same `npm run db:migrate` over the
+# same db/migrations, and it applies only what the database has not seen, so the two cannot
+# disagree about the schema, whichever runs first.
 #
-# Every push to main, not only one that touches db/: `drizzle-kit migrate` applies only what
-# the database has not seen, so a push with no new migration costs half a minute and changes
-# nothing, and there is no path filter to get wrong. Also by hand from the Actions tab, and as
-# a reusable workflow (`workflow_call`) so the daily ingest can run this same job as its first
-# step. The ingest also migrates first as its own first stage. Both run the same
-# `npm run db:migrate` over the same db/migrations, and it applies only what is missing, so the
-# two cannot disagree about the schema, whichever runs first.
+# It does not run on a push to main. It used to, and .github/workflows/deploy.yml now does that
+# migration itself, as the step before the deploy, so that a push produces one ordered sequence
+# rather than two workflows racing to apply the same migration. Leaving the push trigger here
+# would put a second, unordered migration alongside that one. What remains is the manual and
+# reusable route, which is what the ingest and a person need. See docs/adr/0003.
 #
 # The credential is not a repository secret. It is POSTGRES_URL_NON_POOLING, a secret of the
 # GitHub Environment `production`, which is restricted to the main branch. Only a job that
 # names that environment can read it, the way rolodeck-ai's ADR 0014 scopes its migration
 # credential. It must be the direct, non-pooling connection: DDL does not survive a
 # transaction-mode pooler, and the step before the migration refuses one that looks pooled.
-#
-# What this cannot promise on its own: Vercel's Git integration starts building the same push
-# at the same moment, so without more, the new code could start serving before this finishes.
-# Vercel's Deployment Checks close that gap: with this job ("Apply migrations to production")
-# required there, Vercel does not promote a production deployment until it has passed. That
-# is a Vercel project setting, not something a file in this repo can turn on. See the README.
 
 name: Migrate
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
   workflow_call:
 
