@@ -25,6 +25,7 @@ import type { ResultRecord, SourcedEvent } from "../lib/results/ingest";
 import { readLeaderboard } from "../lib/results/leaderboard";
 import { PlayerIndex } from "../lib/results/names";
 import { defaultSeasons, enoughEvents, eventArticles } from "../lib/results/season";
+import { readPlayoffs } from "../lib/results/playoffs";
 import { readStandings } from "../lib/results/standings";
 import type { EventFailure } from "../lib/results/types";
 import { parseSchedule } from "../lib/schedule/parse";
@@ -75,23 +76,6 @@ async function ingestSeason(
   const events: SourcedEvent[] = [];
   const failures: EventFailure[] = [];
 
-  const standings = await standingsSection(seasonTitle);
-  const standingsUrl =
-    standings === null ? null : revisionUrl(standings.title, standings.revid);
-  if (standingsUrl === null || standings === null) {
-    console.log(
-      "Standings table: none yet, as for any season in progress. Leaderboards only; " +
-        "no signature event or playoff finishes this season until it appears.",
-    );
-  } else {
-    const parsed = readStandings(standings.wikitext);
-    events.push(...parsed.events.map((e) => ({ ...e, sourceUrl: standingsUrl })));
-    failures.push(...parsed.failures);
-    console.log(
-      `Standings table: ${parsed.events.length} events read, ${parsed.failures.length} failed.`,
-    );
-  }
-
   const { played, notYetPlayed } = eventArticles(scheduleRows, season, today);
   const missing: string[] = [];
   const doubtful: string[] = [];
@@ -122,6 +106,48 @@ async function ingestSeason(
     }
   }
   const leaderboardsRead = played.length - missing.length;
+
+  // The playoffs table goes in before the standings table: for the three playoff events it is
+  // the whole field and the finish as printed, where the standings table has only the top 30.
+  const playedOn = new Map(scheduleRows.map((row) => [row.pageTitle, row.endDate < today]));
+  const playoffsTitle = `${season} FedEx Cup Playoffs`;
+  let playoffsUrl: string | null = null;
+  let playoffsNotYetPlayed: string[] = [];
+  try {
+    const article = await fetchArticle(playoffsTitle);
+    playoffsUrl = revisionUrl(article.title, article.revid);
+    const parsed = readPlayoffs(article.wikitext);
+    const url = playoffsUrl;
+    const isPlayed = (e: { pageTitle: string }) => playedOn.get(e.pageTitle) !== false;
+    playoffsNotYetPlayed = parsed.events.filter((e) => !isPlayed(e)).map((e) => e.pageTitle);
+    events.push(...parsed.events.filter(isPlayed).map((e) => ({ ...e, sourceUrl: url })));
+    failures.push(...parsed.failures);
+    console.log(
+      `Playoffs table: ${parsed.events.length - playoffsNotYetPlayed.length} events read, ` +
+        `${playoffsNotYetPlayed.length} not yet played, ${parsed.failures.length} failed.`,
+    );
+  } catch (error) {
+    if (!(error instanceof MissingArticleError)) throw error;
+    missing.push(playoffsTitle);
+    console.log(`Playoffs table: "${playoffsTitle}" has no article yet.`);
+  }
+
+  const standings = await standingsSection(seasonTitle);
+  const standingsUrl =
+    standings === null ? null : revisionUrl(standings.title, standings.revid);
+  if (standingsUrl === null || standings === null) {
+    console.log(
+      "Standings table: none yet, as for any season in progress. No signature event " +
+        "finishes this season until it appears.",
+    );
+  } else {
+    const parsed = readStandings(standings.wikitext);
+    events.push(...parsed.events.map((e) => ({ ...e, sourceUrl: standingsUrl })));
+    failures.push(...parsed.failures);
+    console.log(
+      `Standings table: ${parsed.events.length} events read, ${parsed.failures.length} failed.`,
+    );
+  }
 
   // A dry run first, against the schedule rather than the database, so that a season refused
   // below has written nothing at all, Tournaments included. The row numbers stand in for ids.
@@ -158,9 +184,12 @@ async function ingestSeason(
   const built = buildResultRecords(events, tournamentIds, index);
   await upsertResults(db, built.records);
 
-  const eventsFrom = (basis: string) =>
-    new Set(built.records.filter((r) => r.basis === basis).map((r) => r.tournamentId)).size;
-  const rowsFrom = (basis: string) => built.records.filter((r) => r.basis === basis).length;
+  const from = (url: string | null, basis = "standings") => {
+    const rows = built.records.filter(
+      (r) => r.basis === basis && (url === null || r.sourceUrl === url),
+    );
+    return `${rows.length} rows for ${new Set(rows.map((r) => r.tournamentId)).size} events`;
+  };
   const withRounds = built.records.filter((r) => r.round1 !== null).length;
   const unmatchedLines = [...built.unmatched.values()].reduce((a, b) => a + b, 0);
 
@@ -168,12 +197,18 @@ async function ingestSeason(
     `Events that yielded results: ${new Set(built.records.map((r) => r.tournamentId)).size}`,
   );
   console.log(
-    `Rows written: ${built.records.length}: ${rowsFrom("leaderboard")} from ` +
-      `${eventsFrom("leaderboard")} full-field leaderboards (${withRounds} with round scores), ` +
-      `${rowsFrom("standings")} from the standings table for ${eventsFrom("standings")} events`,
+    `Rows written: ${built.records.length}, of which ${withRounds} with round scores.`,
+  );
+  console.log(`  from event leaderboards: ${from(null, "leaderboard")}`);
+  console.log(
+    `  from the playoffs table: ${playoffsUrl === null ? "none" : from(playoffsUrl)}`,
   );
   console.log(
-    `Skipped, not yet played: ${notYetPlayed.length}${notYetPlayed.length ? ` (${notYetPlayed.join(", ")})` : ""}`,
+    `  from the standings table: ${standingsUrl === null ? "none" : from(standingsUrl)}`,
+  );
+  const unplayed = [...notYetPlayed, ...playoffsNotYetPlayed];
+  console.log(
+    `Skipped, not yet played: ${unplayed.length}${unplayed.length ? ` (${unplayed.join(", ")})` : ""}`,
   );
   console.log(
     `Skipped, played but no article yet: ${missing.length}${missing.length ? ` (${missing.join(", ")})` : ""}`,
@@ -190,8 +225,7 @@ async function ingestSeason(
     console.log(`Ambiguous names, matching more than one player and so matched to none:`);
     for (const [name, count] of built.ambiguous) console.log(`  ${count}  ${name}`);
   }
-  if (standingsUrl) console.log(`Source: Wikipedia, CC BY-SA 4.0. Standings: ${standingsUrl}`);
-  else console.log("Source: Wikipedia, CC BY-SA 4.0.");
+  console.log("Source: Wikipedia, CC BY-SA 4.0.");
 
   return { season, written: built.records, refused: false };
 }
