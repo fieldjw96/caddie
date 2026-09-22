@@ -49,6 +49,12 @@ describe("the migrate workflow", () => {
     expect(code).not.toMatch(/(echo|printf)[^\n]*\$\{?DATABASE_URL/);
     expect(code).not.toMatch(/(echo|printf)[^\n]*secrets\./);
   });
+
+  it("is what the daily ingest runs first, and no stage starts until it has passed", () => {
+    const ingest = workflow("ingest.yml");
+    expect(ingest).toMatch(/^ {2}migrate:\n {4}uses: \.\/\.github\/workflows\/migrate\.yml$/m);
+    expect(ingest).toMatch(/^ {2}ingest:\n {4}needs: migrate$/m);
+  });
 });
 
 describe("the smoke workflow", () => {

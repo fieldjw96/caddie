@@ -1,0 +1,105 @@
+# The only thing that writes data to production (migrate.yml writes only its schema). The site
+# reads; this populates what it reads, from nothing if need be: migrations first, then every ingest in dependency order, then a
+# count of what is stored. See lib/ingest/stages.ts for the order and why it is that order.
+#
+# Daily, at 06:17 UTC, and by hand from the Actions tab. Golf results change weekly at most,
+# after a Tournament's Sunday, and the schedule and course facts more rarely still, so a day
+# is already more often than anything upstream changes. Hourly would be 24 times the load on
+# Wikipedia and OpenGolfAPI, both of them free to use and asking to be used politely, for no
+# fresher answer. 06:17 is after OpenGolfAPI's daily allowance resets at 00:00 UTC, off the
+# hour when everyone else's cron fires, and before a European morning reads the page.
+#
+# OpenGolfAPI allows 500 anonymous requests a day and a run needs about 80, all from the
+# courses stage. That stage checks what it needs against what is left before it asks, reads
+# the server's own remaining count as it goes, and if it would run out it stops, writes
+# nothing and fails: a table is never half filled. `concurrency` below means a manual run
+# queues behind a scheduled one rather than both spending the same allowance at once.
+#
+# The connection string is the repository secret CADDIE_DATABASE_URL and nothing else. It
+# reaches the scripts as DATABASE_URL, the name db/client.ts and drizzle.config.ts read. It is
+# never echoed: every line a stage prints is redacted by scripts/ingest-stage.ts before it is
+# shown or kept, and the last step fails the run if any kept log still shows a credential.
+
+name: Ingest
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # The same job that runs on every push to main, before any stage. The migrate stage below
+  # then finds nothing left to apply. It stays in so the stages still run as one sequence from
+  # nothing, locally too. Both run `npm run db:migrate` over the same db/migrations, so this
+  # ingest and the migrate workflow cannot disagree about the schema, and if production's
+  # migration fails, no stage writes.
+  migrate:
+    uses: ./.github/workflows/migrate.yml
+
+  ingest:
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.CADDIE_DATABASE_URL }}
+      INGEST_LOG_DIR: ${{ runner.temp }}/ingest-logs
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Nothing after checkout needs git credentials, and leaving them persisted makes the
+          # job token readable to `npm ci`'s install scripts and to every ingest.
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Says whether it is set and never what it is.
+      - name: Check CADDIE_DATABASE_URL is set
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error title=No production database::The repository secret CADDIE_DATABASE_URL is not set. Set it with: gh secret set CADDIE_DATABASE_URL"
+            exit 1
+          fi
+          {
+            echo "### Ingest stages"
+            echo ""
+            echo "| Stage | Script | Outcome |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # One step per stage, so the run page says which one failed, and each stage's script
+      # also names itself in an error annotation. A failed stage stops the run: every later
+      # stage reads what the earlier ones stored.
+      - name: "Stage: migrate"
+        run: npx tsx scripts/ingest-stage.ts migrate
+      - name: "Stage: schedule"
+        run: npx tsx scripts/ingest-stage.ts schedule
+      - name: "Stage: players"
+        run: npx tsx scripts/ingest-stage.ts players
+      - name: "Stage: courses"
+        run: npx tsx scripts/ingest-stage.ts courses
+      - name: "Stage: course facts"
+        run: npx tsx scripts/ingest-stage.ts course facts
+      - name: "Stage: results"
+        run: npx tsx scripts/ingest-stage.ts results
+      - name: "Stage: course traits"
+        run: npx tsx scripts/ingest-stage.ts course traits
+      - name: "Stage: strengths"
+        run: npx tsx scripts/ingest-stage.ts strengths
+      - name: "Stage: report"
+        run: npx tsx scripts/ingest-stage.ts report
+
+      # Whether the stages passed or not: a failed stage is the likeliest to have printed a
+      # driver error with a URL in it.
+      - name: Check no log shows a credential
+        if: always()
+        run: npx tsx scripts/ingest-check-logs.ts
