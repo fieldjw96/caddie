@@ -19,7 +19,8 @@ export const LICENCES = {
     home: "https://en.wikipedia.org/",
     licence: "CC BY-SA 4.0",
     licenceUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
-    covers: "the schedule, each Tournament's venue and every result",
+    covers:
+      "the schedule, each Tournament's venue, every result, and a matched Course's altitude and green surface where its own article states them",
   },
   opengolfapi: {
     name: "OpenGolfAPI",
@@ -81,6 +82,15 @@ function Attribution({ data }: { data: PageData | null }) {
           Schedule:{" "}
           <a href={data.tournament.sourceUrl} className="underline">
             the Wikipedia revision it was read from
+          </a>
+          .
+        </p>
+      )}
+      {data?.course?.courseFactsSourceUrl && (
+        <p className="mt-1 text-muted">
+          Altitude and green surface:{" "}
+          <a href={data.course.courseFactsSourceUrl} className="underline">
+            the Wikipedia revision they were read from
           </a>
           .
         </p>

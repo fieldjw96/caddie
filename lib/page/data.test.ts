@@ -48,8 +48,14 @@ describe("courseProfile", () => {
       "Mean par 4": "452 yards",
       "Longest par 4": "510 yards",
       "Slope against rating": "72.9 points",
+      Altitude: "105 feet above sea level",
+      "Green surface": "Bermuda",
       Architect: "Dick Wilson",
     });
+    const length = lines.find((l) => l.label === "Length");
+    expect(length && "detail" in length ? length.detail : null).toBe(
+      "published championship total; plays like 7,450 yards adjusted for altitude",
+    );
   });
 
   it("shows hole-derived Traits as unavailable, with the arithmetic, when holes are untrusted", () => {
@@ -64,14 +70,37 @@ describe("courseProfile", () => {
     expect(lines.find((l) => l.label === "Length")?.value).toBe("7,555 yards");
   });
 
-  it("never leaves a line blank: altitude, which nothing stores, says so", () => {
+  it("never leaves a line blank", () => {
     const lines = courseProfile(TRUSTED_COURSE, TRUSTED_TRAITS);
-    const altitude = lines.find((l) => l.label === "Altitude");
-    expect(altitude?.value).toBeNull();
     for (const line of lines) {
       if (line.value === null) expect(line.reason.length).toBeGreaterThan(10);
       else expect(line.value).not.toBe("");
     }
+  });
+
+  it("says why, when a Course is matched but no Source has stored its altitude or green surface", () => {
+    const course = { ...TRUSTED_COURSE, altitude: null, greenSurface: null };
+    const lines = courseProfile(course, TRUSTED_TRAITS);
+    const altitude = lines.find((l) => l.label === "Altitude");
+    const greenSurface = lines.find((l) => l.label === "Green surface");
+    expect(altitude?.value).toBeNull();
+    expect(altitude && "reason" in altitude ? altitude.reason : "").toContain(
+      "no Source we hold has stored this Course's altitude",
+    );
+    expect(greenSurface?.value).toBeNull();
+    expect(greenSurface && "reason" in greenSurface ? greenSurface.reason : "").toContain(
+      "no Source we hold has stored this Course's green surface",
+    );
+  });
+
+  it("shows the raw length alone when no altitude-adjusted length is stored", () => {
+    const traits = { ...TRUSTED_TRAITS };
+    delete (traits as Record<string, unknown>).altitude_adjusted_length_yards;
+    const lines = courseProfile(TRUSTED_COURSE, traits);
+    const length = lines.find((l) => l.label === "Length");
+    expect(length && "detail" in length ? length.detail : null).toBe(
+      "published championship total",
+    );
   });
 
   it("states every line as unavailable when no Course is matched", () => {

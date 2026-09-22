@@ -44,6 +44,7 @@ function trustedCourse(overrides: Partial<CourseFacts> = {}): CourseFacts {
     holes: trustedHoles(),
     holesCheckedTee: "black",
     holesTrusted: true,
+    altitude: null,
     ...overrides,
   };
 }
@@ -60,6 +61,7 @@ function asCourseFacts(row: CourseRow): CourseFacts {
     holes: row.holes ?? null,
     holesCheckedTee: row.holesCheckedTee ?? null,
     holesTrusted: row.holesTrusted ?? null,
+    altitude: row.altitude ?? null,
   };
 }
 
@@ -209,5 +211,45 @@ describe("deriveCourseTraits", () => {
     expect(byTrait(traits, "longest_par_4_yards")).toBeUndefined();
     expect(byTrait(traits, "mean_par_4_yards")).toBeUndefined();
     expect(byTrait(traits, "par_4_count")).toMatchObject({ value: 10 });
+  });
+
+  describe("altitude_adjusted_length_yards", () => {
+    it("is refused, not guessed at sea level, for a Course with no stored altitude", () => {
+      const traits = deriveCourseTraits(trustedCourse({ altitude: null }));
+      expect(byTrait(traits, "altitude_adjusted_length_yards")).toBeUndefined();
+    });
+
+    it("shortens the published length by 2% per 1,000 feet", () => {
+      const traits = deriveCourseTraits(
+        trustedCourse({ publishedYardage: 7500, altitude: 5000 }),
+      );
+      // 10% further at 5,000 feet, so the same carry needs 7500 / 1.10 yards of card.
+      expect(byTrait(traits, "altitude_adjusted_length_yards")).toMatchObject({
+        value: 7500 / 1.1,
+        unit: "yards",
+        source: "derived",
+      });
+    });
+
+    it("is unchanged at sea level", () => {
+      const traits = deriveCourseTraits(
+        trustedCourse({ publishedYardage: 7500, altitude: 0 }),
+      );
+      expect(byTrait(traits, "altitude_adjusted_length_yards")).toMatchObject({ value: 7500 });
+    });
+
+    it("is refused, not zeroed, for a Course with no published yardage", () => {
+      const traits = deriveCourseTraits(
+        trustedCourse({ publishedYardage: null, altitude: 5000 }),
+      );
+      expect(byTrait(traits, "altitude_adjusted_length_yards")).toBeUndefined();
+    });
+
+    it("is unaffected by holes_trusted, being course-level data", () => {
+      const traits = deriveCourseTraits(
+        trustedCourse({ holesTrusted: false, altitude: 5000 }),
+      );
+      expect(byTrait(traits, "altitude_adjusted_length_yards")).toBeDefined();
+    });
   });
 });

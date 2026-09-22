@@ -25,9 +25,13 @@
 //   the two published numbers is the closest thing open data offers to "this course punishes a
 //   wayward shot", without this repo inventing a formula of its own to get there.
 //
-// Altitude is not measured here. Wikipedia carries it, per docs/adr/0002's list, but no ingest
-// Ticket has stored it on a Course yet, and adding a new fetch is out of scope for a module
-// that only derives from facts already stored. It can be added once that fact exists.
+// - `altitude_adjusted_length_yards`, the published total adjusted for the ball flying further
+//   at altitude, so a 7,500 yard course at 5,000 feet and one at sea level no longer read as
+//   the same test. The adjustment is 2% of carry per 1,000 feet of altitude — the rate this
+//   Ticket's own brief states ("the ball flies roughly 10% further at 5,000 feet") — applied by
+//   dividing the published total by (1 + 0.02 * altitude_feet / 1000), since a ball that flies
+//   further needs less club to cover the same yardage. Refused outright, not guessed at sea
+//   level, for a Course whose altitude is not stored.
 //
 // `length_yards`, `par` and `slope_rating_gap` are course-level: OpenGolfAPI's own published
 // total, par and per-tee card, trusted whatever the hole-by-hole data says. The par mix, both
@@ -43,8 +47,21 @@ import type { CourseHole, CourseTee, courses } from "../db/schema";
 /** The columns of a stored course a Trait can be built from. */
 export type CourseFacts = Pick<
   typeof courses.$inferSelect,
-  "par" | "publishedYardage" | "tees" | "holes" | "holesCheckedTee" | "holesTrusted"
+  | "par"
+  | "publishedYardage"
+  | "tees"
+  | "holes"
+  | "holesCheckedTee"
+  | "holesTrusted"
+  | "altitude"
 >;
+
+/**
+ * Percent of carry the ball gains per 1,000 feet of altitude, per this Ticket's brief. A whole
+ * course's worth of physics reduced to one declared number, on display rather than hidden in
+ * arithmetic, in the spirit of every other Weighting this repo shows rather than fits.
+ */
+export const ALTITUDE_DISTANCE_GAIN_PERCENT_PER_1000_FEET = 2;
 
 /** One derived Trait, ready for `course_traits` once a `courseId` is attached to it. */
 export type DerivedCourseTrait = {
@@ -103,6 +120,19 @@ function courseLevelTraits(course: CourseFacts): DerivedCourseTrait[] {
 
   if (course.par !== null) {
     traits.push(makeTrait("par", course.par, "strokes", courseLevel("courses.par")));
+  }
+
+  if (course.publishedYardage !== null && course.altitude !== null) {
+    const factor =
+      1 + (ALTITUDE_DISTANCE_GAIN_PERCENT_PER_1000_FEET / 100) * (course.altitude / 1000);
+    traits.push(
+      makeTrait(
+        "altitude_adjusted_length_yards",
+        course.publishedYardage / factor,
+        "yards",
+        courseLevel("courses.published_yardage, courses.altitude"),
+      ),
+    );
   }
 
   const tee = championshipTee(course.tees, course.publishedYardage);
