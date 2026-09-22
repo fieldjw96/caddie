@@ -127,7 +127,7 @@ export async function fetchSection(page: string, heading: string): Promise<Wikit
     redirects: "1",
     prop: "sections",
   });
-  throwIfMediaWikiError(sectionsPayload, `section list of "${page}"`);
+  throwIfMediaWikiError(sectionsPayload, `section list of "${page}"`, page);
   const sections = parseSectionsResponseSchema.parse(sectionsPayload).parse.sections;
   const section = sections.find((s) => s.line === heading);
   if (!section) {
@@ -143,7 +143,7 @@ export async function fetchSection(page: string, heading: string): Promise<Wikit
     prop: "wikitext|revid",
     section: section.index,
   });
-  throwIfMediaWikiError(payload, `section "${heading}" of "${page}"`);
+  throwIfMediaWikiError(payload, `section "${heading}" of "${page}"`, page);
   const parsed = parseWikitextResponseSchema.parse(payload);
   return parsed.parse;
 }
@@ -160,7 +160,7 @@ export async function fetchIntro(page: string): Promise<WikitextArticle> {
     prop: "wikitext|revid",
     section: "0",
   });
-  throwIfMediaWikiError(payload, `intro of "${page}"`);
+  throwIfMediaWikiError(payload, `intro of "${page}"`, page);
   const parsed = parseWikitextResponseSchema.parse(payload);
   return parsed.parse;
 }
