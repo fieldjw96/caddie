@@ -1,1 +1,58 @@
 @import "tailwindcss";
+
+/*
+ * The page's colours, as tokens. There is no theme toggle: the reader's system setting picks
+ * the palette and the page follows it. Anything that draws text, a chart included, takes its
+ * colour from these variables so it is legible in both.
+ */
+:root {
+  --paper: #fbfaf6;
+  --panel: #f2f1ea;
+  --ink: #17201b;
+  --muted: #56615a;
+  --rule: #d7dbd3;
+  --accent: #1d6b45;
+  --gain: #1d6b45;
+  --loss: #a33a2a;
+  --gap: #8a5a00;
+  --gap-panel: #fbf1dc;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #111613;
+    --panel: #1a211d;
+    --ink: #e7ece8;
+    --muted: #9ba89f;
+    --rule: #2e3832;
+    --accent: #6fcf9a;
+    --gain: #6fcf9a;
+    --loss: #f08f7d;
+    --gap: #e8b75a;
+    --gap-panel: #2a2314;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-gap: var(--gap);
+  --color-gap-panel: var(--gap-panel);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-feature-settings: "tnum" 1;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+}
