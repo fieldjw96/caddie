@@ -51,6 +51,12 @@ const parseWikitextResponseSchema = z.object({
   }),
 });
 
+const searchResponseSchema = z.object({
+  query: z.object({
+    search: z.array(z.object({ title: z.string() })),
+  }),
+});
+
 const parseSectionsResponseSchema = z.object({
   parse: z.object({
     title: z.string(),
@@ -157,6 +163,27 @@ export async function fetchIntro(page: string): Promise<WikitextArticle> {
   throwIfMediaWikiError(payload, `intro of "${page}"`);
   const parsed = parseWikitextResponseSchema.parse(payload);
   return parsed.parse;
+}
+
+/** One page a MediaWiki full-text search returned. */
+export interface SearchHit {
+  title: string;
+}
+
+/**
+ * Up to `limit` articles MediaWiki's own full-text search ranks `query` against, most relevant
+ * first. Used only when no exact title is known to fetch directly — see
+ * lib/courses/wikipedia-name.ts for what "confident" means once results come back.
+ */
+export async function searchArticles(query: string, limit = 5): Promise<SearchHit[]> {
+  const payload = await callApi({
+    action: "query",
+    list: "search",
+    srsearch: query,
+    srlimit: String(limit),
+  });
+  throwIfMediaWikiError(payload, `search for "${query}"`);
+  return searchResponseSchema.parse(payload).query.search;
 }
 
 /** The permanent link to the exact revision an article was read at, not just the article. */
