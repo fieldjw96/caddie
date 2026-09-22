@@ -36,6 +36,13 @@
       "when": 1790049948400,
       "tag": "0004_results_basis_and_rounds",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790051933416,
+      "tag": "0005_player_strengths_sample_size",
+      "breakpoints": true
     }
   ]
 }
