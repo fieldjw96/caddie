@@ -18,6 +18,9 @@ export interface PlayerView {
   name: string;
   country: string | null;
   skill: StrengthView | null;
+  consistency: StrengthView | null;
+  lowRounds: StrengthView | null;
+  /** How the Player has done lately: shown beside the Fit Score, never inside it. */
   form: StrengthView | null;
   /** The record at this Course: shown beside the Fit Score, never inside it. */
   venueRecord: StrengthView | null;

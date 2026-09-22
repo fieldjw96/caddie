@@ -4,9 +4,9 @@
  * What it means. A Fit Score says how well one Player's game suits one Course, as we see it.
  * It is an opinion with its arithmetic on display. The facts going in are the Course's Traits
  * (how long it is, how hard it punishes a bad shot, how many par 5s it has) and the Player's
- * Strengths (how much of the field they have beaten, over their record and lately). The
- * opinions going in are ours and are all declared in this file: which Strength each Trait
- * calls for, and how much each Trait counts, its Weighting. A reader who disagrees with a
+ * Strengths (how much of the field they beat, how steady their rounds are, how often they go
+ * low). The opinions going in are ours and are all declared in this file: which Strength each
+ * Trait calls for, and how much each Trait counts, its Weighting. A reader who disagrees with a
  * Weighting can change it and see the new answer. Nothing here is fitted to past results,
  * and docs/adr/0002 records why: the open data covers about six venue-seasons a year, too few
  * to tell what a course rewards from who happened to be playing it.
@@ -15,6 +15,23 @@
  * finish, and it is not a probability of anything. A Player with the highest Fit Score is the
  * one whose record best matches what this Course asks for, on our Weightings. Nothing more.
  *
+ * Which Strength each Trait calls for. This is the part that makes it a fit rather than a
+ * ranking of who is good, and it is declared, not fitted, exactly as the Weightings are:
+ *
+ * - Length, mean par 4 and longest par 4 call for Skill. A long Course hands every Player a
+ *   longer club into every green, so a lapse costs more and class tells. Saying so plainly is
+ *   the honest answer: length is not a matter of style.
+ * - Slope against rating calls for Consistency. The gap between how a Course plays for a
+ *   bogey golfer and for a scratch one measures how hard it punishes the wayward shot, which
+ *   costs the Player whose rounds swing more than the one whose rounds hold.
+ * - Par 5 share calls for Low rounds. More par 5s are more chances at birdie and eagle: a
+ *   scoring week, won by whoever can go low when the Course lets them.
+ *
+ * Form is in no Trait. It says who is playing well lately, which is who is good, not whose
+ * game suits this Course, and like a venue record the page shows it beside the Fit Score
+ * rather than inside it. fit.test.ts asserts that not every Trait calls for the same Strength,
+ * so this cannot quietly collapse back into one quantity reweighted.
+ *
  * How it is worked out, in four steps.
  *
  * 1. Each Trait is placed on a scale from 0 to 1 within a fixed range stated below: a Course
@@ -22,8 +39,9 @@
  *    Strength that Trait calls for. A very long Course asks a lot of all-round class; a short
  *    one asks little.
  *
- * 2. Each Strength is already a share of the field beaten, 0 to 1, where 0.5 is exactly the
- *    middle of the field. It is turned into an edge, from -1 to +1: (2 x Strength) - 1. A
+ * 2. Each Strength is already a share, 0 to 1, where 0.5 is exactly the middle: of the field
+ *    beaten, for Skill, or of the other Players with a value beaten, for Consistency and Low
+ *    rounds. It is turned into an edge, from -1 to +1: (2 x Strength) - 1. A
  *    Player who beats three quarters of the field has an edge of +0.5; one who beats a
  *    quarter has an edge of -0.5.
  *
@@ -73,8 +91,11 @@ export function normalise(value: number, min: number, max: number): number {
   return (clamped - min) / (max - min);
 }
 
-/** The Strengths a Trait can call for: see lib/strengths/derive.ts for what each one is. */
-export type FitStrengthName = "skill" | "form";
+/**
+ * The Strengths a Trait can call for: see lib/strengths/derive.ts for Skill and
+ * lib/strengths/rounds.ts for Consistency and Low rounds.
+ */
+export type FitStrengthName = "skill" | "consistency" | "low_rounds";
 
 /** The Course Traits the Fit Score weighs, as named in lib/course-traits.ts. */
 export type FitTraitName =
@@ -91,27 +112,51 @@ export interface TraitScale {
   max: number;
   /** The Strength a Course high on this Trait calls for. */
   calls: FitStrengthName;
+  /** Why it calls for that Strength, in a sentence the page prints beside the Weighting. */
+  why: string;
 }
 
 /**
- * Each Trait's fixed range, and the Strength it calls for. The ranges span what PGA Tour
+ * Each Trait's fixed range, the Strength it calls for and why. The ranges span what PGA Tour
  * Courses play at from their championship tees, so almost every Course lands inside them.
  */
 export const TRAIT_SCALES: Readonly<Record<FitTraitName, TraitScale>> = {
-  // From a short tour course, about 6,900 yards, to the longest, about 7,800. Length spreads
-  // the field: every approach is a longer club, so a lapse costs more, and class tells.
-  length_yards: { min: 6_900, max: 7_800, calls: "skill" },
-  // Slope minus Course Rating, 60 to 80 points across tour tees. The bigger the gap, the more
-  // the Course punishes a wayward shot, which costs a weaker game more than a stronger one.
-  slope_rating_gap: { min: 60, max: 80, calls: "skill" },
+  // From a short tour course, about 6,900 yards, to the longest, about 7,800.
+  length_yards: {
+    min: 6_900,
+    max: 7_800,
+    calls: "skill",
+    why: "Every approach is a longer club, so a lapse costs more and class tells.",
+  },
+  // Slope minus Course Rating, 60 to 80 points across tour tees.
+  slope_rating_gap: {
+    min: 60,
+    max: 80,
+    calls: "consistency",
+    why: "The bigger the gap, the harder the Course punishes a wayward shot, which costs the Player whose rounds swing more than the one whose rounds hold.",
+  },
   // The average par 4, 400 to 480 yards. Like total length, but measured on the holes where
   // most of a round's approach shots are played, so par 5s do not inflate it.
-  mean_par_4_yards: { min: 400, max: 480, calls: "skill" },
-  // The longest par 4, 460 to 540 yards: whether one hole asks for a long iron into a green.
-  longest_par_4_yards: { min: 460, max: 540, calls: "skill" },
-  // Par 5s as a share of eighteen holes, from 2 of 18 to 5 of 18. More par 5s mean more
-  // chances to make birdie, which rewards a Player making birdies now: Form, not the record.
-  par_5_share: { min: 2 / 18, max: 5 / 18, calls: "form" },
+  mean_par_4_yards: {
+    min: 400,
+    max: 480,
+    calls: "skill",
+    why: "Long par 4s test the approach game on most of the holes in a round, and that is class, not style.",
+  },
+  // The longest par 4, 460 to 540 yards.
+  longest_par_4_yards: {
+    min: 460,
+    max: 540,
+    calls: "skill",
+    why: "Whether one hole asks for a long iron into a green: the same test as length, on one hole.",
+  },
+  // Par 5s as a share of eighteen holes, from 2 of 18 to 5 of 18.
+  par_5_share: {
+    min: 2 / 18,
+    max: 5 / 18,
+    calls: "low_rounds",
+    why: "More par 5s mean more chances at birdie and eagle: a scoring week, which suits the Player who can go low when the Course lets them.",
+  },
 };
 
 /** How much each Trait counts. Any non-negative numbers: they need not add up to 1. */
@@ -125,15 +170,16 @@ export const DEFAULT_WEIGHTINGS: Weightings = {
   // The heaviest, because it is the one Trait every Course has, read off its own published
   // card, and the plainest statement of how demanding a Course is.
   length_yards: 0.3,
-  // Nearly as heavy: the only published measure of how hard a Course plays beyond its length.
+  // Nearly as heavy: the only published measure of how hard a Course plays beyond its length,
+  // and the Trait that calls for Consistency.
   slope_rating_gap: 0.25,
   // Where par 4s are long, the approach game is tested all round. Lighter than total length
   // because it overlaps with it, and because it is refused when hole data is untrusted.
   mean_par_4_yards: 0.15,
   // One hole's worth of the same idea, so the lightest.
   longest_par_4_yards: 0.1,
-  // The one Trait that calls for Form: enough to separate a hot Player at a birdie-fest, not
-  // so much that a few weeks outweigh a record.
+  // The one Trait that calls for Low rounds: enough to separate a Player who goes low at a
+  // birdie-fest, not so much that a scoring week outweighs everything else about the Course.
   par_5_share: 0.2,
 };
 

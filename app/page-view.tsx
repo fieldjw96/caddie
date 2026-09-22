@@ -195,9 +195,11 @@ export function PageView({ data }: { data: PageData | null }) {
             </li>
           )}
           <li>
-            <strong>Anything about how a Player plays.</strong> No open source carries
-            shot-level data or strokes gained, so Skill and Form are measured from finishing
-            positions alone. A Strength resting on fewer than five results is not stated.
+            <strong>Most of how a Player plays.</strong> No open source carries shot-level data
+            or strokes gained. Skill and Form are measured from finishing positions, and
+            Consistency and Low rounds from round scores, which only the full-field
+            leaderboards of the majors and the Players carry. A Strength resting on fewer than
+            five events is not stated.
           </li>
           <li>
             <strong>What this Course rewards.</strong> The Weightings are declared, not fitted:

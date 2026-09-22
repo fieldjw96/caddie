@@ -50,6 +50,9 @@
 // scores, if anything, harsh, never generous.
 //
 // Out of scope, deliberately: any adjustment for the strength of a field beyond its size.
+//
+// These three say how good a Player is. What kind of game they have, Consistency and Low
+// rounds, is derived from round scores in ./rounds.ts.
 
 import { STRENGTH_MINIMUM_SAMPLE, type ResultBasis } from "../../db/schema";
 
@@ -73,7 +76,8 @@ export const FORM_WINDOW_DAYS = 180;
 /** Finishes that rank a Player behind every finisher, and count. */
 const MISSED_CUT = new Set(["CUT", "MC"]);
 
-export type StrengthName = "skill" | "form" | "venue_record";
+/** Skill, Form and venue record are derived here; Consistency and Low rounds in ./rounds.ts. */
+export type StrengthName = "skill" | "form" | "venue_record" | "consistency" | "low_rounds";
 
 /** One stored result, as much of a `results` row, joined to its Tournament, as this needs. */
 export interface StoredResult {

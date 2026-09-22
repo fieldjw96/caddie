@@ -52,9 +52,10 @@ const strength = (value: number | null, sampleSize: number) => ({ value, sampleS
 
 /**
  * Three Players with a Fit Score and one without. Ahead on Skill, Clark leads on the declared
- * Weightings, which lean on the Traits that call for Skill; Baker, ahead on Form, leads once
- * only the par 5 share counts. Adams has Skill but no Form, so one of Adams's contributions
- * is "no record". Dunn has too few results for anything.
+ * Weightings, which lean on the Traits that call for Skill; Baker, ahead on Low rounds, leads
+ * once only the par 5 share counts. Adams has Skill but too few events for Consistency or Low
+ * rounds, so two of Adams's contributions are "no record". Dunn has too few results for
+ * anything. Form is shown beside the Fit Score and counts in none of it: Adams's is strong.
  */
 export const PLAYERS: PlayerView[] = [
   {
@@ -62,7 +63,9 @@ export const PLAYERS: PlayerView[] = [
     name: "Alex Adams",
     country: "England",
     skill: strength(0.6, 8),
-    form: strength(null, 3),
+    consistency: strength(null, 3),
+    lowRounds: strength(null, 3),
+    form: strength(0.99, 6),
     venueRecord: null,
   },
   {
@@ -70,7 +73,9 @@ export const PLAYERS: PlayerView[] = [
     name: "Blair Baker",
     country: "United States",
     skill: strength(0.55, 9),
-    form: strength(0.95, 6),
+    consistency: strength(0.5, 6),
+    lowRounds: strength(0.95, 6),
+    form: strength(0.4, 6),
     venueRecord: strength(null, 1),
   },
   {
@@ -78,6 +83,8 @@ export const PLAYERS: PlayerView[] = [
     name: "Casey Clark",
     country: null,
     skill: strength(0.9, 12),
+    consistency: strength(0.5, 7),
+    lowRounds: strength(0.5, 7),
     form: strength(0.5, 5),
     venueRecord: strength(0.8, 5),
   },
@@ -86,6 +93,8 @@ export const PLAYERS: PlayerView[] = [
     name: "Drew Dunn",
     country: "Australia",
     skill: strength(null, 2),
+    consistency: strength(null, 1),
+    lowRounds: strength(null, 1),
     form: strength(null, 0),
     venueRecord: null,
   },
