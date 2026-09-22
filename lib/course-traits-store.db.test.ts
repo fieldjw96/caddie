@@ -27,6 +27,7 @@ async function makeCourse(): Promise<number> {
     .values({
       name: `${run}-${++counter}`,
       source: "opengolfapi",
+      sourceUrl: `https://api.opengolfapi.org/api/v1/courses/${run}-${counter}`,
       attribution: "© A Source",
     })
     .returning({ id: courses.id });
