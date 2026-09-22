@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:db": "vitest run --config vitest.db.config.ts",
+    "ingest:schedule": "tsx scripts/ingest-schedule.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },

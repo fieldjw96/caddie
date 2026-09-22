@@ -8,6 +8,13 @@
       "when": 1790044966817,
       "tag": "0000_source_rule",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790046934731,
+      "tag": "0001_add_tournament_course_name",
+      "breakpoints": true
     }
   ]
 }
