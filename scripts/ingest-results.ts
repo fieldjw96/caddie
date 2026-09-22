@@ -18,7 +18,7 @@ import { buildResultRecords, ensureTournaments, upsertResults } from "../lib/res
 import type { SourcedEvent } from "../lib/results/ingest";
 import { parseLeaderboard } from "../lib/results/leaderboard";
 import { PlayerIndex } from "../lib/results/names";
-import { parseStandings } from "../lib/results/standings";
+import { readStandings } from "../lib/results/standings";
 import type { EventFailure } from "../lib/results/types";
 import { parseSchedule } from "../lib/schedule/parse";
 import {
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
   const failures: EventFailure[] = [];
 
   const standingsUrl = revisionUrl(standings.title, standings.revid);
-  const parsedStandings = parseStandings(standings.wikitext);
+  const parsedStandings = readStandings(standings.wikitext);
   events.push(...parsedStandings.events.map((e) => ({ ...e, sourceUrl: standingsUrl })));
   failures.push(...parsedStandings.failures);
   console.log(

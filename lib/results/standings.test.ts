@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STANDINGS_TARGETS, standingsSection, thirtyStandingsRows } from "./fixtures";
-import { parseStandings } from "./standings";
+import { STANDINGS_TABLE, parseStandings, readStandings } from "./standings";
 
 function eventFor(parse: ReturnType<typeof parseStandings>, pageTitle: string) {
   const event = parse.events.find((e) => e.pageTitle === pageTitle);
@@ -96,5 +96,34 @@ describe("parseStandings", () => {
 
   it("throws when there is no marked table at all", () => {
     expect(() => parseStandings("===Standings===\nNo table.")).toThrow(/MajorsPly/);
+  });
+});
+
+describe("readStandings", () => {
+  it("reads a sound table exactly as parseStandings does", () => {
+    const section = standingsSection(thirtyStandingsRows());
+    expect(readStandings(section)).toEqual(parseStandings(section));
+  });
+
+  it("turns a table unreadable as a whole into one failure rather than a throw", () => {
+    const parse = readStandings(standingsSection(thirtyStandingsRows().slice(0, 29)));
+    expect(parse.events).toEqual([]);
+    expect(parse.failures).toEqual([
+      {
+        pageTitle: STANDINGS_TABLE,
+        basis: "standings",
+        reason: expect.stringMatching(/29 marked rows, expected 30/),
+      },
+    ]);
+  });
+
+  it("does the same for a header that no longer lines up", () => {
+    const section = standingsSection(thirtyStandingsRows()).replace(
+      "{{abbr|[[RBC Heritage|X]]|RBC Heritage}}",
+      "RBC Heritage",
+    );
+    const parse = readStandings(section);
+    expect(parse.events).toEqual([]);
+    expect(parse.failures[0]!.reason).toMatch(/links 14 events, expected 15/);
   });
 });

@@ -295,3 +295,27 @@ export function parseStandings(sectionWikitext: string): StandingsParse {
 
   return { events, failures };
 }
+
+/** The page title a whole-table failure is reported under, having no one event to name. */
+export const STANDINGS_TABLE = "FedEx Cup standings table";
+
+/**
+ * `parseStandings` for a run: a table unreadable as a whole costs the standings' events, as
+ * one failure naming why, and never the leaderboards read after it.
+ */
+export function readStandings(sectionWikitext: string): StandingsParse {
+  try {
+    return parseStandings(sectionWikitext);
+  } catch (error) {
+    return {
+      events: [],
+      failures: [
+        {
+          pageTitle: STANDINGS_TABLE,
+          basis: "standings",
+          reason: error instanceof Error ? error.message : String(error),
+        },
+      ],
+    };
+  }
+}
