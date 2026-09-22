@@ -83,12 +83,18 @@ function feetFromPlainText(text: string): number | null {
   return null;
 }
 
-/** The Course's altitude in feet, from its article's `elevation` infobox field. */
+/**
+ * The Course's altitude in feet, from its article's `elevation` infobox field. A course at sea
+ * level is often written as the words "Sea level" (usually itself a wikilink) rather than a
+ * `{{convert}}` template or a number — Waialae Country Club and TPC Louisiana both do this — so
+ * that reads as 0 ft rather than as an absent field.
+ */
 export function parseAltitudeFeet(wikitext: string): number | null {
   const raw = infoboxRawValue(wikitext, "elevation");
   if (raw === null) return null;
   const cleaned = stripMarkup(raw);
   if (cleaned === "") return null;
+  if (/^sea level$/i.test(cleaned)) return 0;
   return feetFromConvertTemplate(cleaned) ?? feetFromPlainText(cleaned);
 }
 
