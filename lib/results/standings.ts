@@ -210,7 +210,11 @@ function parseTourChampionship(
         reason: `${player.name}'s position "${finish.finish}" is not a finishing position.`,
       };
     }
-    parsed.push({ entry: { ...player, finish, rounds: null }, position: finish.position, toPar });
+    parsed.push({
+      entry: { ...player, finish, rounds: null },
+      position: finish.position,
+      toPar,
+    });
   }
 
   const byPosition = [...parsed].sort((a, b) => a.position - b.position);
@@ -218,7 +222,9 @@ function parseTourChampionship(
     const before = byPosition[i - 1]!;
     const after = byPosition[i]!;
     const agrees =
-      before.position === after.position ? before.toPar === after.toPar : before.toPar < after.toPar;
+      before.position === after.position
+        ? before.toPar === after.toPar
+        : before.toPar < after.toPar;
     if (!agrees) {
       return {
         pageTitle,

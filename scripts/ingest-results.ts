@@ -50,7 +50,9 @@ async function findSeason(): Promise<{ season: number; standings: WikitextArticl
       console.log(`The ${season} PGA Tour article has no FedEx Cup standings yet.`);
     }
   }
-  throw new Error(`None of the last ${SEASONS_TO_TRY} season articles has FedEx Cup standings.`);
+  throw new Error(
+    `None of the last ${SEASONS_TO_TRY} season articles has FedEx Cup standings.`,
+  );
 }
 
 async function main(): Promise<void> {
