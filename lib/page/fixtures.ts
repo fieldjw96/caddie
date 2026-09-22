@@ -14,6 +14,9 @@ export const TRUSTED_COURSE: CourseView = {
   holesYardageDifference: 0,
   publishedYardage: 7466,
   championshipTee: { name: "championship", slope: 150, rating: 77.1 },
+  altitude: 105,
+  greenSurface: "Bermuda",
+  courseFactsSourceUrl: "https://en.wikipedia.org/w/index.php?title=Bay_Hill&oldid=1",
 };
 
 export const TRUSTED_TRAITS: StoredTraits = {
@@ -26,6 +29,7 @@ export const TRUSTED_TRAITS: StoredTraits = {
   mean_par_4_yards: { value: 452.4, unit: "yards" },
   longest_par_4_yards: { value: 510, unit: "yards" },
   slope_rating_gap: { value: 72.9, unit: "points" },
+  altitude_adjusted_length_yards: { value: 7450, unit: "yards" },
 };
 
 export const UNTRUSTED_COURSE: CourseView = {

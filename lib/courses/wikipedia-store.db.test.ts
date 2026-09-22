@@ -38,10 +38,7 @@ async function makeCourse(): Promise<number> {
 async function refusal(values: Record<string, unknown>): Promise<string> {
   const id = await makeCourse();
   try {
-    await db
-      .update(courses)
-      .set(values)
-      .where(eq(courses.id, id));
+    await db.update(courses).set(values).where(eq(courses.id, id));
   } catch (error) {
     const cause = (error as { cause?: unknown }).cause ?? error;
     if (cause instanceof postgres.PostgresError && cause.constraint_name) {

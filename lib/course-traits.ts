@@ -47,7 +47,13 @@ import type { CourseHole, CourseTee, courses } from "../db/schema";
 /** The columns of a stored course a Trait can be built from. */
 export type CourseFacts = Pick<
   typeof courses.$inferSelect,
-  "par" | "publishedYardage" | "tees" | "holes" | "holesCheckedTee" | "holesTrusted" | "altitude"
+  | "par"
+  | "publishedYardage"
+  | "tees"
+  | "holes"
+  | "holesCheckedTee"
+  | "holesTrusted"
+  | "altitude"
 >;
 
 /**

@@ -104,5 +104,8 @@ export interface CourseWikipediaFacts {
 
 /** Both facts this Ticket reads, from one article's wikitext. */
 export function extractCourseFacts(wikitext: string): CourseWikipediaFacts {
-  return { altitudeFeet: parseAltitudeFeet(wikitext), greenSurface: parseGreenSurface(wikitext) };
+  return {
+    altitudeFeet: parseAltitudeFeet(wikitext),
+    greenSurface: parseGreenSurface(wikitext),
+  };
 }

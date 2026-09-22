@@ -125,6 +125,9 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
           holesYardageDifference: courseRow.holesYardageDifference,
           publishedYardage: courseRow.publishedYardage,
           championshipTee: championshipTee(courseRow.tees, courseRow.publishedYardage),
+          altitude: courseRow.altitude,
+          greenSurface: courseRow.greenSurface,
+          courseFactsSourceUrl: courseRow.altitudeSourceUrl ?? courseRow.greenSurfaceSourceUrl,
         };
 
   return {

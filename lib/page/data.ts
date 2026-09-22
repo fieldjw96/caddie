@@ -46,6 +46,12 @@ export interface CourseView {
   publishedYardage: number | null;
   /** The tee whose card matches the published total, where one does. */
   championshipTee: { name: string; slope: number | null; rating: number | null } | null;
+  /** Feet above sea level, from the Course's own Wikipedia article. Most articles lack it. */
+  altitude: number | null;
+  /** The putting surface, verbatim from the Course's own Wikipedia article. */
+  greenSurface: string | null;
+  /** Where altitude and/or green surface were read, whichever is stored. */
+  courseFactsSourceUrl: string | null;
 }
 
 /** One stored Course Trait, by name. */
@@ -145,9 +151,17 @@ export function courseProfile(course: CourseView | null, traits: StoredTraits): 
 
   const lines: ProfileLine[] = [];
   const length = t("length_yards");
+  const adjustedLength = t("altitude_adjusted_length_yards");
   lines.push(
     length !== undefined
-      ? { label: "Length", value: yards(length), detail: "published championship total" }
+      ? {
+          label: "Length",
+          value: yards(length),
+          detail:
+            adjustedLength !== undefined
+              ? `published championship total; plays like ${yards(adjustedLength)} adjusted for altitude`
+              : "published championship total",
+        }
       : {
           label: "Length",
           value: null,
@@ -220,11 +234,34 @@ export function courseProfile(course: CourseView | null, traits: StoredTraits): 
         },
   );
 
-  lines.push({
-    label: "Altitude",
-    value: null,
-    reason: "Not shown: no Source we hold has stored this Course's altitude yet.",
-  });
+  const altitude = course?.altitude ?? null;
+  lines.push(
+    altitude !== null
+      ? {
+          label: "Altitude",
+          value: `${altitude.toLocaleString("en-US")} feet above sea level`,
+        }
+      : {
+          label: "Altitude",
+          value: null,
+          reason:
+            courseLevel ??
+            "Not shown: no Source we hold has stored this Course's altitude yet.",
+        },
+  );
+
+  const greenSurface = course?.greenSurface ?? null;
+  lines.push(
+    greenSurface !== null
+      ? { label: "Green surface", value: greenSurface }
+      : {
+          label: "Green surface",
+          value: null,
+          reason:
+            courseLevel ??
+            "Not shown: no Source we hold has stored this Course's green surface yet.",
+        },
+  );
 
   if (course?.architect) lines.push({ label: "Architect", value: course.architect });
   return lines;

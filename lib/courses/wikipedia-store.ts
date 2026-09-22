@@ -14,7 +14,10 @@ type Database = PgDatabase<PgQueryResultHKT>;
  * read this run (`no-article`) is left as it was: a fetch failure says nothing about whether
  * a fact stored by an earlier run still holds, so nothing here overwrites it with null.
  */
-export async function storeCourseFacts(db: Database, outcome: CourseFactsOutcome): Promise<void> {
+export async function storeCourseFacts(
+  db: Database,
+  outcome: CourseFactsOutcome,
+): Promise<void> {
   if (outcome.status !== "read") return;
   await db
     .update(courses)

@@ -33,8 +33,10 @@ async function main(): Promise<void> {
     for (const outcome of outcomes) {
       await storeCourseFacts(db, outcome);
       if (outcome.status === "read") {
-        const altitude = outcome.altitudeFeet === null ? "no altitude" : `${outcome.altitudeFeet} ft`;
-        const greens = outcome.greenSurface === null ? "no green surface" : outcome.greenSurface;
+        const altitude =
+          outcome.altitudeFeet === null ? "no altitude" : `${outcome.altitudeFeet} ft`;
+        const greens =
+          outcome.greenSurface === null ? "no green surface" : outcome.greenSurface;
         console.log(`  ok    ${outcome.name}: ${altitude}, ${greens}`);
       } else {
         console.log(`  miss  ${outcome.name}: ${outcome.reason}`);

@@ -76,6 +76,16 @@ describe("PageView, rendered on the server", () => {
     expect(t).toContain("Regular tour events are not covered");
   });
 
+  it("shows altitude and green surface, and the altitude-adjusted length beside the raw one", () => {
+    const t = text(DATA);
+    expect(t).toContain("105 feet above sea level");
+    expect(t).toContain("Bermuda");
+    expect(t).toContain("plays like 7,450 yards adjusted for altitude");
+    expect(html(DATA)).toContain(
+      `href="${TRUSTED_COURSE.courseFactsSourceUrl!.replace(/&/g, "&amp;")}"`,
+    );
+  });
+
   it("shows untrusted hole data as unavailable, with the reason", () => {
     const t = text(UNTRUSTED);
     expect(t).toContain("Unavailable.");
