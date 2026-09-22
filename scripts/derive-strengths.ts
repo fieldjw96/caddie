@@ -1,7 +1,8 @@
 // `npm run derive:strengths`. Derives every Player's Skill, Form and venue record at the next
-// Tournament's Course from the results already stored, and replaces `player_strengths` with
-// them. Reads nothing from the network. See lib/strengths/derive.ts for what each Strength is
-// and why most of them are null.
+// Tournament's Course, and their Consistency and Low rounds, from the results already stored,
+// and replaces `player_strengths` with them. Reads nothing from the network. See
+// lib/strengths/derive.ts and lib/strengths/rounds.ts for what each Strength is and why most
+// of them are null.
 //
 // `npm run derive:strengths -- 2026-06-01` derives as of a named day instead of today.
 
@@ -15,6 +16,7 @@ import {
   type PlayerStrengths,
   type StoredResult,
 } from "../lib/strengths/derive";
+import { deriveRoundStrengths, MINIMUM_ROUND_FIELD } from "../lib/strengths/rounds";
 import { loadResults, replaceStrengths, strengthRecords } from "../lib/strengths/store";
 import { nextTournament } from "../lib/schedule/next-tournament";
 
@@ -47,7 +49,8 @@ async function main(): Promise<void> {
   for (const id of playerIds) {
     derived.set(id, deriveStrengths(byPlayer.get(id) ?? [], fields, { asOf, courseId }));
   }
-  await replaceStrengths(db, strengthRecords(derived, courseId));
+  const fromRounds = deriveRoundStrengths(rows, asOf, playerIds);
+  await replaceStrengths(db, strengthRecords(derived, courseId, fromRounds));
 
   const all = [...derived.values()];
   const count = (test: (s: PlayerStrengths) => boolean) => all.filter(test).length;
@@ -69,6 +72,15 @@ async function main(): Promise<void> {
   console.log(`Non-null Skill: ${count((s) => s.skill.value !== null)}`);
   console.log(`Non-null Form: ${count((s) => s.form.value !== null)}`);
   console.log(`Non-null venue record: ${count((s) => s.venueRecord?.value != null)}`);
+  const rounded = [...fromRounds.values()];
+  const withRounds = rounded.filter((s) => s.consistency.sampleSize > 0).length;
+  console.log(
+    `Players with at least one usable round: ${withRounds}. A round's field needs ${MINIMUM_ROUND_FIELD} scores.`,
+  );
+  console.log(
+    `Non-null Consistency: ${rounded.filter((s) => s.consistency.value !== null).length}`,
+  );
+  console.log(`Non-null Low rounds: ${rounded.filter((s) => s.lowRounds.value !== null).length}`);
   console.log(
     `Nothing at all (every Strength null): ${count(
       (s) => s.skill.value === null && s.form.value === null && s.venueRecord?.value == null,
