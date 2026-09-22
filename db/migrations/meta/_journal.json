@@ -57,6 +57,13 @@
       "when": 1790090569047,
       "tag": "0007_course_altitude_and_green_surface",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790092971413,
+      "tag": "0008_courses_altitude_and_green_surface_source",
+      "breakpoints": true
     }
   ]
 }

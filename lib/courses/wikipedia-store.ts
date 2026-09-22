@@ -23,8 +23,10 @@ export async function storeCourseFacts(
     .update(courses)
     .set({
       altitude: outcome.altitudeFeet,
+      altitudeSource: outcome.altitudeFeet === null ? null : "wikipedia",
       altitudeSourceUrl: outcome.altitudeFeet === null ? null : outcome.sourceUrl,
       greenSurface: outcome.greenSurface,
+      greenSurfaceSource: outcome.greenSurface === null ? null : "wikipedia",
       greenSurfaceSourceUrl: outcome.greenSurface === null ? null : outcome.sourceUrl,
     })
     .where(eq(courses.id, outcome.courseId));

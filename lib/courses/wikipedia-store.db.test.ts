@@ -72,8 +72,10 @@ describe("storeCourseFacts", () => {
     const [stored] = await db.select().from(courses).where(eq(courses.id, id));
     expect(stored).toMatchObject({
       altitude: 235,
+      altitudeSource: "wikipedia",
       altitudeSourceUrl: outcome.sourceUrl,
       greenSurface: "Bentgrass",
+      greenSurfaceSource: "wikipedia",
       greenSurfaceSourceUrl: outcome.sourceUrl,
     });
   });
@@ -92,8 +94,10 @@ describe("storeCourseFacts", () => {
     const [stored] = await db.select().from(courses).where(eq(courses.id, id));
     expect(stored).toMatchObject({
       altitude: null,
+      altitudeSource: null,
       altitudeSourceUrl: null,
       greenSurface: null,
+      greenSurfaceSource: null,
       greenSurfaceSourceUrl: null,
     });
   });
@@ -132,6 +136,25 @@ describe("courses", () => {
     ).toBe("courses_altitude_source_is_recorded");
   });
 
+  it("refuses an altitude with a source_url but no source", async () => {
+    expect(
+      await refusal({
+        altitude: 235,
+        altitudeSourceUrl: "https://en.wikipedia.org/wiki/Test_Course",
+      }),
+    ).toBe("courses_altitude_source_is_recorded");
+  });
+
+  it("refuses an altitude whose source isn't wikipedia", async () => {
+    expect(
+      await refusal({
+        altitude: 235,
+        altitudeSource: "opengolfapi",
+        altitudeSourceUrl: "https://en.wikipedia.org/wiki/Test_Course",
+      }),
+    ).toBe("courses_altitude_source_is_recorded");
+  });
+
   it("refuses a green surface with no source_url", async () => {
     expect(await refusal({ greenSurface: "Bentgrass" })).toBe(
       "courses_green_surface_source_is_recorded",
@@ -142,6 +165,25 @@ describe("courses", () => {
     expect(
       await refusal({
         greenSurface: " ",
+        greenSurfaceSourceUrl: "https://en.wikipedia.org/wiki/Test_Course",
+      }),
+    ).toBe("courses_green_surface_source_is_recorded");
+  });
+
+  it("refuses a green surface with a source_url but no source", async () => {
+    expect(
+      await refusal({
+        greenSurface: "Bentgrass",
+        greenSurfaceSourceUrl: "https://en.wikipedia.org/wiki/Test_Course",
+      }),
+    ).toBe("courses_green_surface_source_is_recorded");
+  });
+
+  it("refuses a green surface whose source isn't wikipedia", async () => {
+    expect(
+      await refusal({
+        greenSurface: "Bentgrass",
+        greenSurfaceSource: "opengolfapi",
         greenSurfaceSourceUrl: "https://en.wikipedia.org/wiki/Test_Course",
       }),
     ).toBe("courses_green_surface_source_is_recorded");

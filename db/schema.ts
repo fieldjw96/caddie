@@ -156,7 +156,10 @@ export const courses = pgTable(
     /**
      * The whole row's `source`/`source_url` are OpenGolfAPI's, so altitude carries its own:
      * always Wikipedia, always the revision it was read at. Null exactly when `altitude` is.
+     * `altitude_source` is a real Source value, not a comment's word for it: the database
+     * enforces `wikipedia` the same way it enforces every other per-fact Source in this schema.
      */
+    altitudeSource: source("altitude_source"),
     altitudeSourceUrl: text("altitude_source_url"),
     /**
      * The putting surface as the Course's own Wikipedia article states it, verbatim: "Bentgrass",
@@ -164,7 +167,8 @@ export const courses = pgTable(
      * combination nobody anticipated. Null means that article does not state it.
      */
     greenSurface: text("green_surface"),
-    /** Same idea as `altitude_source_url`: Wikipedia's, independent of the row's own Source. */
+    /** Same idea as `altitude_source`/`altitude_source_url`: Wikipedia's, independent of the row's own Source. */
+    greenSurfaceSource: source("green_surface_source"),
     greenSurfaceSourceUrl: text("green_surface_source_url"),
     ...provenance,
   },
@@ -179,16 +183,18 @@ export const courses = pgTable(
     ),
     // Altitude and green surface each carry their own Source, because they come from
     // Wikipedia whatever the row's own `source` is. Absent means absent: no default, no sea
-    // level, no "bentgrass probably", and never a value with nowhere it came from.
+    // level, no "bentgrass probably", and never a value with nowhere it came from. Both are
+    // read from Wikipedia alone, so `_source` is pinned to that enum value rather than left
+    // to a comment's word for it.
     check(
       "courses_altitude_source_is_recorded",
-      sql`(${t.altitude} is null and ${t.altitudeSourceUrl} is null)
-        or (${t.altitude} is not null and ${t.altitudeSourceUrl} is not null and btrim(${t.altitudeSourceUrl}) <> '')`,
+      sql`(${t.altitude} is null and ${t.altitudeSource} is null and ${t.altitudeSourceUrl} is null)
+        or (${t.altitude} is not null and ${t.altitudeSource} is not null and ${t.altitudeSource} = 'wikipedia' and ${t.altitudeSourceUrl} is not null and btrim(${t.altitudeSourceUrl}) <> '')`,
     ),
     check(
       "courses_green_surface_source_is_recorded",
-      sql`(${t.greenSurface} is null and ${t.greenSurfaceSourceUrl} is null)
-        or (${t.greenSurface} is not null and btrim(${t.greenSurface}) <> '' and ${t.greenSurfaceSourceUrl} is not null and btrim(${t.greenSurfaceSourceUrl}) <> '')`,
+      sql`(${t.greenSurface} is null and ${t.greenSurfaceSource} is null and ${t.greenSurfaceSourceUrl} is null)
+        or (${t.greenSurface} is not null and btrim(${t.greenSurface}) <> '' and ${t.greenSurfaceSource} is not null and ${t.greenSurfaceSource} = 'wikipedia' and ${t.greenSurfaceSourceUrl} is not null and btrim(${t.greenSurfaceSourceUrl}) <> '')`,
     ),
     // A verdict with its working, or no verdict: `holes_trusted` never stands alone.
     check(
