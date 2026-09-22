@@ -10,6 +10,7 @@ import {
   holesUnavailableReason,
   type PageData,
 } from "../lib/page/data";
+import { ROSTER_WINDOW_MONTHS } from "../lib/roster";
 import { Ranking } from "./ranking";
 
 export const LICENCES = {
@@ -131,8 +132,8 @@ export function PageView({ data }: { data: PageData | null }) {
         </p>
         <p className="mt-3 rounded border border-rule bg-gap-panel p-3 text-sm">
           <strong>The field is assumed, not confirmed.</strong> No open source publishes entry
-          lists, so this ranks the regular tour roster we hold, {players.length} Players,
-          rather than the Players actually entered this week.
+          lists, so this ranks Players with a stored result in the last {ROSTER_WINDOW_MONTHS}{" "}
+          months, {players.length} Players, rather than the Players actually entered this week.
         </p>
       </header>
 
@@ -173,8 +174,9 @@ export function PageView({ data }: { data: PageData | null }) {
         </h2>
         <ul className="mt-3 max-w-prose list-disc space-y-2 pl-5">
           <li>
-            <strong>The field.</strong> It is assumed: the {players.length} Players on the tour
-            roster we hold, not a confirmed entry list, because no open source publishes one.
+            <strong>The field.</strong> It is assumed: the {players.length} Players with a
+            stored result in the last {ROSTER_WINDOW_MONTHS} months, not a confirmed entry
+            list, because no open source publishes one.
           </li>
           <li>
             <strong>Most results.</strong> {coverageSentences(coverage).join(" ")}
