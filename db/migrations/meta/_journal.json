@@ -43,6 +43,13 @@
       "when": 1790051933416,
       "tag": "0005_player_strengths_sample_size",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790087442596,
+      "tag": "0006_tournament_course_match",
+      "breakpoints": true
     }
   ]
 }

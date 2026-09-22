@@ -126,6 +126,7 @@ export async function ensureTournaments(
         season,
         startDate: row.startDate,
         endDate: row.endDate,
+        location: row.location,
         source: "wikipedia" as const,
         sourceUrl,
       })),

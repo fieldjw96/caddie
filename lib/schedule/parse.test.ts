@@ -104,6 +104,15 @@ describe("parseSchedule", () => {
     });
   });
 
+  it("keeps the Location cell as plain text", () => {
+    expect(rows.map((row) => row.location)).toEqual([
+      "Hawaii",
+      "Hawaii",
+      "Georgia",
+      "Louisiana",
+    ]);
+  });
+
   it("strips bold markup from a major's name and link", () => {
     expect(rows[2]).toMatchObject({
       name: "Masters Tournament",
