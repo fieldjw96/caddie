@@ -42,6 +42,13 @@ jobs:
   # migration fails, no stage writes.
   migrate:
     uses: ./.github/workflows/migrate.yml
+    # A reusable workflow called with `uses:` receives none of the caller's secrets unless they
+    # are passed. Without this the migrate job runs, reaches its own connection check, and
+    # reports POSTGRES_URL_NON_POOLING as unset even though it is set on the production
+    # environment and the very same job succeeds when it runs standalone on push. Proven both
+    # ways: run 35781367155 failed here while run 35776303632, the same job by itself with the
+    # same secret, passed its check and applied the migrations.
+    secrets: inherit
 
   ingest:
     needs: migrate
