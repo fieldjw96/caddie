@@ -291,9 +291,21 @@ export const courseTraits = pgTable(
 );
 
 /**
+ * The fewest results a Player Strength may rest on and still be stated as a number. The
+ * reasoning is beside `MINIMUM_SAMPLE` in lib/strengths/derive.ts, which is this figure; the
+ * database checks the same arithmetic, so it appears in
+ * `player_strengths_value_needs_minimum_sample` too.
+ */
+export const STRENGTH_MINIMUM_SAMPLE = 5;
+
+/**
  * One measurable characteristic of a Player's game. Always Derived, computed here from
  * scoring data, never copied from anyone's published rating: the table refuses any other
  * Source.
+ *
+ * `value` is null when the Strength rests on too few results to state: "no record" is a
+ * stored answer, not a missing row. `sample_size` is the number of results it rests on, and
+ * is there whether or not `value` is, because the page shows it beside every Strength.
  */
 export const playerStrengths = pgTable(
   "player_strengths",
@@ -303,12 +315,19 @@ export const playerStrengths = pgTable(
       .notNull()
       .references(() => players.id),
     strength: text("strength").notNull(),
-    value: doublePrecision("value").notNull(),
+    value: doublePrecision("value"),
+    sampleSize: integer("sample_size").notNull(),
     ...provenance,
   },
   (t) => [
     uniqueIndex("player_strengths_player_strength_unique").on(t.playerId, t.strength),
     check("player_strengths_are_derived", sql`${t.source} = 'derived'`),
+    check("player_strengths_sample_size_is_not_negative", sql`${t.sampleSize} >= 0`),
+    // The 5 is STRENGTH_MINIMUM_SAMPLE: below it, a number would be noise, and is refused.
+    check(
+      "player_strengths_value_needs_minimum_sample",
+      sql`${t.value} is null or ${t.sampleSize} >= 5`,
+    ),
     sourceIsRecorded("player_strengths", t),
   ],
 );
