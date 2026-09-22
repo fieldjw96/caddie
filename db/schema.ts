@@ -146,6 +146,26 @@ export const courses = pgTable(
     holesTrusted: boolean("holes_trusted"),
     /** The attribution the Source's licence requires, ready for a page to print as it is. */
     attribution: text("attribution"),
+    /**
+     * Feet above sea level, from the Course's own Wikipedia article. Wikipedia states this in
+     * feet, in metres, or as both via `{{convert}}`; a metric reading is converted to feet
+     * (1 m = 3.28084 ft, rounded to the nearest foot) before it is stored, so every row is in
+     * the same unit. Null means that article does not state it, which is most of them.
+     */
+    altitude: integer("altitude"),
+    /**
+     * The whole row's `source`/`source_url` are OpenGolfAPI's, so altitude carries its own:
+     * always Wikipedia, always the revision it was read at. Null exactly when `altitude` is.
+     */
+    altitudeSourceUrl: text("altitude_source_url"),
+    /**
+     * The putting surface as the Course's own Wikipedia article states it, verbatim: "Bentgrass",
+     * "Bermuda grass", "Poa annua". Free text on purpose — an enum would silently drop whatever
+     * combination nobody anticipated. Null means that article does not state it.
+     */
+    greenSurface: text("green_surface"),
+    /** Same idea as `altitude_source_url`: Wikipedia's, independent of the row's own Source. */
+    greenSurfaceSourceUrl: text("green_surface_source_url"),
     ...provenance,
   },
   (t) => [
@@ -156,6 +176,19 @@ export const courses = pgTable(
     check(
       "courses_opengolfapi_is_attributed",
       sql`${t.source} <> 'opengolfapi' or (${t.attribution} is not null and btrim(${t.attribution}) <> '')`,
+    ),
+    // Altitude and green surface each carry their own Source, because they come from
+    // Wikipedia whatever the row's own `source` is. Absent means absent: no default, no sea
+    // level, no "bentgrass probably", and never a value with nowhere it came from.
+    check(
+      "courses_altitude_source_is_recorded",
+      sql`(${t.altitude} is null and ${t.altitudeSourceUrl} is null)
+        or (${t.altitude} is not null and ${t.altitudeSourceUrl} is not null and btrim(${t.altitudeSourceUrl}) <> '')`,
+    ),
+    check(
+      "courses_green_surface_source_is_recorded",
+      sql`(${t.greenSurface} is null and ${t.greenSurfaceSourceUrl} is null)
+        or (${t.greenSurface} is not null and btrim(${t.greenSurface}) <> '' and ${t.greenSurfaceSourceUrl} is not null and btrim(${t.greenSurfaceSourceUrl}) <> '')`,
     ),
     // A verdict with its working, or no verdict: `holes_trusted` never stands alone.
     check(
