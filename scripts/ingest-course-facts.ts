@@ -3,21 +3,63 @@
 // first: this enriches the Courses OpenGolfAPI has already matched, rather than fetching a
 // Wikipedia article for a Course that is not on the schedule at all.
 //
-// One request per Course, at the module-wide one-a-second throttle every Wikipedia caller
-// shares (lib/schedule/wikipedia.ts). A Course whose article cannot be found, or whose infobox
-// states neither field, is expected and reported, not an error: these are prose-adjacent
-// articles and most will come back with at least one fact missing. Idempotent: storing the
-// same reading twice writes the same row, and a fetch failure never overwrites an earlier
-// success.
+// The article looked up is the Wikipedia-native facility name lib/courses/wikipedia-name.ts
+// derives from the schedule's own Course name (joined in from `tournaments`, which is where
+// `ingest:schedule` already read it from each Tournament's own article), never OpenGolfAPI's
+// reconstructed one — see that Ticket for why the two differ enough to matter. A Course a
+// Tournament names in more than one season keeps whichever schedule name was recorded first;
+// they should not disagree.
+//
+// One or two requests per Course — one more only when the exact title misses and a search
+// fallback finds a confident match — at the module-wide one-a-second throttle every Wikipedia
+// caller shares (lib/schedule/wikipedia.ts). A Course whose article cannot be found
+// confidently, or whose infobox states neither field, is expected and reported, not an error:
+// these are prose-adjacent articles and most will come back with at least one fact missing.
+// Idempotent: storing the same reading twice writes the same row, and a fetch failure never
+// overwrites an earlier success.
 
+import { eq } from "drizzle-orm";
 import { client, db } from "../db/migration-client";
-import { courses } from "../db/schema";
-import { fetchCourseFacts } from "../lib/courses/wikipedia-ingest";
+import { courses, tournaments } from "../db/schema";
+import { fetchCourseFacts, type CourseToRead } from "../lib/courses/wikipedia-ingest";
+import { wikipediaFacilityName } from "../lib/courses/wikipedia-name";
 import { storeCourseFacts } from "../lib/courses/wikipedia-store";
+
+type MigrationDb = typeof db;
+
+/**
+ * Every stored Course, with the Wikipedia-native facility name resolved from whichever of its
+ * Tournaments named a Course first. `courses` outlives any one Tournament, and more than one
+ * can be matched to it across seasons; the first recorded is as good a choice as any, since a
+ * Course's own name does not change under it.
+ */
+async function coursesToRead(db: MigrationDb): Promise<CourseToRead[]> {
+  const rows = await db
+    .select({
+      id: courses.id,
+      name: courses.name,
+      scheduleCourseName: tournaments.courseName,
+    })
+    .from(courses)
+    .leftJoin(tournaments, eq(tournaments.courseId, courses.id))
+    .orderBy(courses.id, tournaments.recordedAt);
+
+  const byId = new Map<number, CourseToRead>();
+  for (const row of rows) {
+    if (byId.has(row.id)) continue;
+    byId.set(row.id, {
+      id: row.id,
+      name: row.name,
+      wikipediaName:
+        row.scheduleCourseName === null ? null : wikipediaFacilityName(row.scheduleCourseName),
+    });
+  }
+  return [...byId.values()];
+}
 
 async function main(): Promise<void> {
   try {
-    const stored = await db.select({ id: courses.id, name: courses.name }).from(courses);
+    const stored = await coursesToRead(db);
     console.log(`Reading Wikipedia for ${stored.length} Courses.`);
 
     const outcomes = await fetchCourseFacts(stored);

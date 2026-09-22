@@ -63,6 +63,16 @@ describe("parseAltitudeFeet", () => {
     expect(parseAltitudeFeet(belowSeaLevel)).toBe(-30);
   });
 
+  it("reads a course written as being at sea level, wikilinked, as 0 ft", () => {
+    const seaLevel = `{{Infobox golf facility\n| elevation = [[Sea level]]\n}}`;
+    expect(parseAltitudeFeet(seaLevel)).toBe(0);
+  });
+
+  it("reads sea level as 0 ft even with a commented-out convert template alongside it", () => {
+    const seaLevel = `{{Infobox golf facility\n|elevation = [[Sea level]]<!-- {{convert|0|ft}} -->\n}}`;
+    expect(parseAltitudeFeet(seaLevel)).toBe(0);
+  });
+
   it("returns null when the elevation field is commented out", () => {
     expect(parseAltitudeFeet(PEBBLE_BEACH)).toBeNull();
   });
