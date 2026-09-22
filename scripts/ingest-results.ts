@@ -22,7 +22,7 @@ import { client, db } from "../db/client";
 import { players, tournaments } from "../db/schema";
 import { buildResultRecords, ensureTournaments, upsertResults } from "../lib/results/ingest";
 import type { ResultRecord, SourcedEvent } from "../lib/results/ingest";
-import { parseLeaderboard } from "../lib/results/leaderboard";
+import { readLeaderboard } from "../lib/results/leaderboard";
 import { PlayerIndex } from "../lib/results/names";
 import { defaultSeasons, enoughEvents, eventArticles } from "../lib/results/season";
 import { readStandings } from "../lib/results/standings";
@@ -94,18 +94,21 @@ async function ingestSeason(
 
   const { played, notYetPlayed } = eventArticles(scheduleRows, season, today);
   const missing: string[] = [];
+  const doubtful: string[] = [];
   console.log(
     `Reading ${played.length} event leaderboards, one request a second: ${played.join(", ") || "none"}.`,
   );
   for (const title of played) {
     try {
       const article = await fetchArticle(title);
+      const leaderboard = readLeaderboard(article.wikitext);
       events.push({
         pageTitle: title,
         basis: "leaderboard",
-        entries: parseLeaderboard(article.wikitext),
+        entries: leaderboard.entries,
         sourceUrl: revisionUrl(article.title, article.revid),
       });
+      doubtful.push(...leaderboard.doubtfulScores.map((note) => `${title}, ${note}`));
     } catch (error) {
       if (error instanceof MissingArticleError) {
         missing.push(title);
@@ -175,6 +178,8 @@ async function ingestSeason(
   console.log(
     `Skipped, played but no article yet: ${missing.length}${missing.length ? ` (${missing.join(", ")})` : ""}`,
   );
+  console.log(`Score cells that do not add up, rounds not stored: ${doubtful.length}`);
+  for (const note of doubtful) console.log(`  ${note}`);
   console.log(`Events that failed to parse: ${failures.length + built.unscheduled.length}`);
   console.log(
     `Unmatched names: ${built.unmatched.size} (on ${unmatchedLines} lines), not created as players:`,

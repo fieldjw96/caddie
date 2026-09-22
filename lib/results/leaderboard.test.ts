@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fieldLines, leaderboardArticle } from "./fixtures";
-import { parseLeaderboard } from "./leaderboard";
+import { MAXIMUM_DOUBTFUL_SCORES, parseLeaderboard, readLeaderboard } from "./leaderboard";
 
 describe("parseLeaderboard", () => {
   it("reads the final leaderboard only, not an earlier round or the scorecard", () => {
@@ -65,10 +65,26 @@ describe("parseLeaderboard", () => {
     );
   });
 
-  it("fails when the rounds do not add up to the total printed", () => {
+  it("keeps the finish and drops the rounds of a line whose total does not add up, and says so", () => {
     const lines = fieldLines();
     lines[0]!.score = "70-70-70-70=281";
-    expect(() => parseLeaderboard(leaderboardArticle(lines))).toThrow(/sum to 280/);
+    lines[1]!.score = "71-67-71-70-279";
+    const { entries, doubtfulScores } = readLeaderboard(leaderboardArticle(lines));
+
+    expect(entries).toHaveLength(32);
+    expect(entries[0]!.rounds).toBeNull();
+    expect(entries[0]!.finish.position).not.toBeNull();
+    expect(entries[1]!.rounds).toBeNull();
+    expect(entries[2]!.rounds).not.toBeNull();
+    expect(doubtfulScores).toHaveLength(2);
+    expect(doubtfulScores[0]).toMatch(/line 1 \(Field Player1\).*sum to 280/);
+    expect(doubtfulScores[1]).toMatch(/line 2 \(Field Player2\)/);
+  });
+
+  it("fails when more score cells fail to add up than an editor's typos would explain", () => {
+    const lines = fieldLines();
+    for (let i = 0; i <= MAXIMUM_DOUBTFUL_SCORES; i++) lines[i]!.score = "70-70-70-70=281";
+    expect(() => parseLeaderboard(leaderboardArticle(lines))).toThrow(/do not add up/);
   });
 
   it("fails when a place cell is not a finish", () => {

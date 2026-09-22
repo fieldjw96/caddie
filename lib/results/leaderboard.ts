@@ -6,6 +6,13 @@
 // and under "Final round" where it does not (the Masters puts it straight under "Final
 // round", with the Players below the top 10 in a second, collapsed table). Either way the
 // section ends at the next heading, which keeps "Scorecard" and a playoff table out of it.
+//
+// A score cell that still reads as scores but does not add up, `69-67-73-74=282`, or has a
+// hyphen typed for its equals sign, `71-67-71-70-279`, is a typo in the Source, and every
+// fresh article has had one or two. It costs that line its round scores, which are stored as
+// null and reported, and not its finish, which is read from its own cell. Every other failure
+// still costs the whole leaderboard, as does more than MAXIMUM_DOUBTFUL_SCORES such typos:
+// that many is a table this parser is misreading, not an editor's slip.
 
 import { z } from "zod";
 import { finishSchema, stripCellMarkup } from "./finish";
@@ -17,6 +24,12 @@ import { firstWikilink, rowCells, tableRows, tables } from "./wikitext";
 const MINIMUM_ENTRIES = 30;
 
 const ROUNDS = 4;
+
+/** More score cells than this that read as scores and do not add up is a misread table. */
+export const MAXIMUM_DOUBTFUL_SCORES = 3;
+
+/** A cell made of two- and three-digit numbers and the separators between them, and no more. */
+const SCORE_LIKE = /^[0-9]{2,3}(?:s*[-–=]s*[0-9]{2,3}){0,5}$/;
 
 /**
  * A score cell: `72-66-66-73=277` for four rounds, `74-73=147` for a missed cut, `72` for a
@@ -58,7 +71,6 @@ const leaderboardRowSchema = z.object({
     name: z.string().min(1, "the Player cell has no name"),
     candidates: z.array(z.string().min(1)).min(1),
   }),
-  score: roundsSchema,
 });
 
 const HEADING = /^(=+)\s*(.+?)\s*\1\s*$/gm;
@@ -88,12 +100,26 @@ function parsePlayerCell(cell: string): { name: string; candidates: string[] } {
   return { name, candidates: name === "" ? [] : [name] };
 }
 
+export interface Leaderboard {
+  entries: ParsedEntry[];
+  /** One note per line whose score cell was a typo, and whose rounds are therefore null. */
+  doubtfulScores: string[];
+}
+
+function failure(line: number, label: string, error: z.ZodError): Error {
+  const issue = error.issues[0];
+  return new Error(
+    `Leaderboard line ${line} (${label}), field "${issue?.path.join(".") || "score"}": ${issue?.message}`,
+  );
+}
+
 /**
  * An event article's final leaderboard. Throws, naming the row and the field, when the
- * article has no leaderboard where one is expected or any line of it fails its schema: a
- * leaderboard with one line misread is not a leaderboard to store part of.
+ * article has no leaderboard where one is expected or any line of it fails its schema, other
+ * than a score cell with a typo in it: see the header. A leaderboard with one line misread is
+ * not a leaderboard to store part of.
  */
-export function parseLeaderboard(articleWikitext: string): ParsedEntry[] {
+export function readLeaderboard(articleWikitext: string): Leaderboard {
   const section =
     sectionUnder(articleWikitext, "Final leaderboard") ??
     sectionUnder(articleWikitext, "Final round");
@@ -102,6 +128,7 @@ export function parseLeaderboard(articleWikitext: string): ParsedEntry[] {
   }
 
   const entries: ParsedEntry[] = [];
+  const doubtfulScores: string[] = [];
   const seen = new Set<string>();
   // A tie is printed as one place cell spanning several rows, so a row without a place cell
   // takes the place of the row above it.
@@ -120,16 +147,21 @@ export function parseLeaderboard(articleWikitext: string): ParsedEntry[] {
       if (place === null) {
         throw new Error(`The leaderboard's first line (${label}) has no place cell.`);
       }
-      const parsed = leaderboardRowSchema.safeParse({
-        place,
-        player,
-        score: cells[playerIndex + 1]?.value ?? "",
-      });
-      if (!parsed.success) {
-        const issue = parsed.error.issues[0];
-        throw new Error(
-          `Leaderboard line ${entries.length + 1} (${label}), field "${issue?.path.join(".")}": ${issue?.message}`,
+      const line = entries.length + 1;
+      const parsed = leaderboardRowSchema.safeParse({ place, player });
+      if (!parsed.success) throw failure(line, label, parsed.error);
+
+      const scoreCell = cells[playerIndex + 1]?.value ?? "";
+      const score = roundsSchema.safeParse(scoreCell);
+      let rounds: Rounds | null = null;
+      if (score.success) {
+        rounds = score.data;
+      } else if (SCORE_LIKE.test(stripCellMarkup(scoreCell))) {
+        doubtfulScores.push(
+          `line ${line} (${label}), "${stripCellMarkup(scoreCell)}": ${score.error.issues[0]?.message}; finish kept, rounds not stored`,
         );
+      } else {
+        throw failure(line, label, score.error);
       }
       if (seen.has(parsed.data.player.name)) {
         throw new Error(`The leaderboard lists ${parsed.data.player.name} twice.`);
@@ -138,15 +170,26 @@ export function parseLeaderboard(articleWikitext: string): ParsedEntry[] {
       entries.push({
         ...parsed.data.player,
         finish: parsed.data.place,
-        rounds: parsed.data.score,
+        rounds,
       });
     }
   }
 
+  if (doubtfulScores.length > MAXIMUM_DOUBTFUL_SCORES) {
+    throw new Error(
+      `The leaderboard has ${doubtfulScores.length} score cells that do not add up, more than the ` +
+        `${MAXIMUM_DOUBTFUL_SCORES} typos a table this parser reads correctly would have: ${doubtfulScores.join("; ")}`,
+    );
+  }
   if (entries.length < MINIMUM_ENTRIES) {
     throw new Error(
       `The leaderboard has ${entries.length} lines, fewer than the ${MINIMUM_ENTRIES} a full field has.`,
     );
   }
-  return entries;
+  return { entries, doubtfulScores };
+}
+
+/** `readLeaderboard`'s entries alone. */
+export function parseLeaderboard(articleWikitext: string): ParsedEntry[] {
+  return readLeaderboard(articleWikitext).entries;
 }
