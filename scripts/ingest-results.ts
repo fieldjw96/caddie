@@ -104,19 +104,20 @@ async function main(): Promise<void> {
   const playerRows = await db.select({ id: players.id, name: players.name }).from(players);
   const index = new PlayerIndex(playerRows);
 
-  const tournamentIds = await ensureTournaments(
-    db,
-    scheduleRows,
-    season,
-    revisionUrl(schedule.title, schedule.revid),
+  // A dry run first, against the schedule rather than the database, so that a run refused
+  // below has written nothing at all, Tournaments included. The row numbers stand in for ids.
+  const scheduled = scheduleRows.filter((row) => !row.canceled);
+  const dryRun = buildResultRecords(
+    events,
+    new Map(scheduled.map((row, i) => [row.pageTitle, i])),
+    index,
   );
-  const built = buildResultRecords(events, tournamentIds, index);
-  const yielded = new Set(built.records.map((r) => r.tournamentId));
+  const yielded = new Set(dryRun.records.map((r) => r.tournamentId));
 
   for (const failure of failures) {
     console.error(`FAILED ${failure.pageTitle} (${failure.basis}): ${failure.reason}`);
   }
-  for (const title of built.unscheduled) {
+  for (const title of dryRun.unscheduled) {
     console.error(`FAILED ${title}: the ${season} schedule has no Tournament linked to it.`);
   }
 
@@ -130,7 +131,15 @@ async function main(): Promise<void> {
     return;
   }
 
+  const tournamentIds = await ensureTournaments(
+    db,
+    scheduleRows,
+    season,
+    revisionUrl(schedule.title, schedule.revid),
+  );
+  const built = buildResultRecords(events, tournamentIds, index);
   await upsertResults(db, built.records);
+  const written = new Set(built.records.map((r) => r.tournamentId));
 
   const byBasis = (basis: string) => built.records.filter((r) => r.basis === basis).length;
   const withRounds = built.records.filter((r) => r.round1 !== null).length;
@@ -138,7 +147,7 @@ async function main(): Promise<void> {
 
   console.log("");
   console.log(`Season: ${season}`);
-  console.log(`Events that yielded results: ${yielded.size}`);
+  console.log(`Events that yielded results: ${written.size}`);
   console.log(
     `Rows written: ${built.records.length} (${byBasis("leaderboard")} from full-field leaderboards, ` +
       `${byBasis("standings")} from the standings table; ${withRounds} with round scores)`,
