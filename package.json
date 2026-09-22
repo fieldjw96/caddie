@@ -23,7 +23,8 @@
     "ingest:players": "tsx scripts/ingest-players.ts",
     "derive:course-traits": "tsx scripts/derive-course-traits.ts",
     "ingest:results": "tsx scripts/ingest-results.ts",
-    "derive:strengths": "tsx scripts/derive-strengths.ts"
+    "derive:strengths": "tsx scripts/derive-strengths.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

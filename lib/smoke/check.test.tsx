@@ -13,7 +13,7 @@ import { PLAYERS, TRUSTED_COURSE, TRUSTED_TRAITS } from "../page/fixtures";
 import { PRODUCTION_URL } from "../production";
 import { checkProductionPage } from "./check";
 
-// Saved verbatim from https://caddie-rosy.vercel.app/ on 2026-09-22, which answered every
+// Saved verbatim from production (lib/production.ts) on 2026-09-22, which answered every
 // request that day with this: HTTP 500, the layout's <head>, and digest 4035168820.
 const BROKEN = readFileSync(
   join(process.cwd(), "lib/smoke/fixtures/production-500-2026-09-22.html"),
@@ -32,7 +32,11 @@ const DATA: PageData = {
   course: TRUSTED_COURSE,
   traits: TRUSTED_TRAITS,
   players: PLAYERS,
-  coverage: { seasons: [2026], leaderboardEvents: ["Masters Tournament"], standingsEvents: [] },
+  coverage: {
+    seasons: [2026],
+    leaderboardEvents: ["Masters Tournament"],
+    standingsEvents: [],
+  },
 };
 
 const page = (data: PageData | null) =>
