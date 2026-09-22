@@ -180,7 +180,9 @@ function checkWeightings(weightings: Weightings): void {
   for (const trait of FIT_TRAITS) {
     const weight = weightings[trait];
     if (!Number.isFinite(weight) || weight < 0) {
-      throw new RangeError(`Weighting for ${trait} must be a finite number >= 0, got ${weight}`);
+      throw new RangeError(
+        `Weighting for ${trait} must be a finite number >= 0, got ${weight}`,
+      );
     }
   }
 }
