@@ -34,6 +34,11 @@ export interface ScheduleRow {
   pageTitle: string;
   startDate: string;
   endDate: string;
+  /**
+   * The Location cell as plain text: a US state ("California") or a country ("Scotland").
+   * Kept so a Course can be matched within its state rather than across the country.
+   */
+  location: string | null;
   canceled: boolean;
 }
 
@@ -129,6 +134,19 @@ function parseDate(cell: string, season: number): string {
   return `${season}-${monthNumber}-${day!.padStart(2, "0")}`;
 }
 
+/** The Location cell as plain text, links and templates reduced to what they display. */
+function parseLocation(cell: string): string | null {
+  const text = stripWikiMarkup(cell)
+    .replace(/\{\{[^{}|]*\|([^{}]*)\}\}/g, "$1")
+    .replace(/\{\{[^{}]*\}\}/g, "")
+    .replace(/\[\[[^|\]]*\|([^\]]+)\]\]/g, "$1")
+    .replace(/\[\[([^\]]+)\]\]/g, "$1")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text === "" ? null : text;
+}
+
 /** A standard PGA Tour tournament is played Thursday through Sunday, four days inclusive. */
 function endDateFromStart(startDate: string): string {
   const start = new Date(`${startDate}T00:00:00Z`);
@@ -153,7 +171,7 @@ export function parseSchedule(sectionWikitext: string, season: number): Schedule
         `Schedule row ${index + 1} (${JSON.stringify(row.cells)}): ${shapeResult.error.issues[0]?.message}`,
       );
     }
-    const [dateCell, tournamentCell] = shapeResult.data;
+    const [dateCell, tournamentCell, locationCell] = shapeResult.data;
 
     const canceled =
       /<\/?s>/i.test(row.cells[0] ?? "") || /Canceled/i.test(row.cells[4] ?? "");
@@ -177,6 +195,7 @@ export function parseSchedule(sectionWikitext: string, season: number): Schedule
       pageTitle: target,
       startDate,
       endDate: endDateFromStart(startDate),
+      location: parseLocation(locationCell!),
       canceled,
     };
   });

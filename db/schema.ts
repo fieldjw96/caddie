@@ -180,10 +180,27 @@ export const courses = pgTable(
 );
 
 /**
+ * How a Tournament's `course_name` was matched to its `courses` row, most certain first.
+ *
+ * - `exact`: OpenGolfAPI's name is the schedule's, character for character, in the same state.
+ * - `normalised`: the same after ignoring case, punctuation, accents and generic words such as
+ *   "Golf Club", in the same state, and no other course in that state reads the same.
+ * - `declared`: a person read both names and wrote the pairing down, in
+ *   `DECLARED_MATCHES` in lib/courses/match.ts, because normalising could not settle it.
+ *
+ * There is no fuzzier level. A match less certain than these is reported and left null.
+ */
+export const courseMatch = pgEnum("course_match", ["exact", "normalised", "declared"]);
+
+export type CourseMatch = (typeof courseMatch.enumValues)[number];
+
+/**
  * One event on the schedule in one season. The Course is nullable because a Tournament can
- * be scheduled before its venue is known to us. `courseName` is the venue as written by the
- * Source, kept even once `courseId` is null; matching it to a `courses` row is a later
- * Ticket's job, not this table's.
+ * be scheduled before its venue is known to us, and because a match that is not certain is
+ * left null rather than guessed. `courseName` is the venue as written by the Source, kept
+ * whether or not it matched; `courseMatch` says how certain the match is, and is present
+ * exactly when `courseId` is. `location` is the schedule's Location cell, a state or a
+ * country, which a match must agree with.
  */
 export const tournaments = pgTable(
   "tournaments",
@@ -194,12 +211,19 @@ export const tournaments = pgTable(
     startDate: date("start_date", { mode: "string" }).notNull(),
     endDate: date("end_date", { mode: "string" }).notNull(),
     courseName: text("course_name"),
+    location: text("location"),
     courseId: integer("course_id").references(() => courses.id),
+    courseMatch: courseMatch("course_match"),
     ...provenance,
   },
   (t) => [
     uniqueIndex("tournaments_name_season_unique").on(t.name, t.season),
     check("tournaments_ends_after_it_starts", sql`${t.endDate} >= ${t.startDate}`),
+    // A matched Course always says how it was matched, and nothing else claims a match.
+    check(
+      "tournaments_course_match_is_recorded",
+      sql`(${t.courseId} is null) = (${t.courseMatch} is null)`,
+    ),
     sourceIsRecorded("tournaments", t),
   ],
 );

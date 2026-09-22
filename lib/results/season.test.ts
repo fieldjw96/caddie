@@ -3,7 +3,7 @@ import type { ScheduleRow } from "../schedule/parse";
 import { defaultSeasons, enoughEvents, eventArticles } from "./season";
 
 function row(pageTitle: string, endDate: string, canceled = false): ScheduleRow {
-  return { name: pageTitle, pageTitle, startDate: endDate, endDate, canceled };
+  return { name: pageTitle, pageTitle, startDate: endDate, endDate, location: null, canceled };
 }
 
 const schedule2026: ScheduleRow[] = [

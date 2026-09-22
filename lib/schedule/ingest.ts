@@ -19,6 +19,7 @@ export interface TournamentRecord {
   startDate: string;
   endDate: string;
   courseName: string | null;
+  location: string | null;
   source: "wikipedia";
   sourceUrl: string;
 }
@@ -43,6 +44,7 @@ export function buildTournamentRecords(
       startDate: row.startDate,
       endDate: row.endDate,
       courseName: courseNames.get(row.pageTitle) ?? null,
+      location: row.location,
       source: "wikipedia" as const,
       sourceUrl,
     }));
@@ -88,6 +90,7 @@ export async function upsertTournaments(
         startDate: sql`excluded.start_date`,
         endDate: sql`excluded.end_date`,
         courseName: sql`excluded.course_name`,
+        location: sql`excluded.location`,
         sourceUrl: sql`excluded.source_url`,
         recordedAt: sql`now()`,
       },

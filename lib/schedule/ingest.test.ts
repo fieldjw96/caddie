@@ -8,6 +8,7 @@ const ROWS: ScheduleRow[] = [
     pageTitle: "The Sentry (Hawaii)",
     startDate: "2026-01-11",
     endDate: "2026-01-14",
+    location: null,
     canceled: true,
   },
   {
@@ -15,6 +16,7 @@ const ROWS: ScheduleRow[] = [
     pageTitle: "Sony Open in Hawaii",
     startDate: "2026-01-18",
     endDate: "2026-01-21",
+    location: null,
     canceled: false,
   },
   {
@@ -22,6 +24,7 @@ const ROWS: ScheduleRow[] = [
     pageTitle: "The American Express",
     startDate: "2026-01-25",
     endDate: "2026-01-28",
+    location: null,
     canceled: false,
   },
 ];

@@ -28,6 +28,8 @@ export const searchResponse = z.object({
       state: z.string().nullable(),
     }),
   ),
+  /** How many courses matched, of which `courses` is the first page: at most 20. */
+  total: z.number().int().nonnegative(),
   _license: z.literal(OPENGOLFAPI_LICENCE),
   /** The attribution ODbL requires, in the words OpenGolfAPI asks for. */
   _attribution: z.string().trim().min(1),
