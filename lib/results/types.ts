@@ -11,7 +11,8 @@ export interface ParsedEntry {
   /** Spellings to match a `players` row on, most specific first. */
   candidates: string[];
   finish: Finish;
-  /** Null for a standings row, which carries no scores at all. */
+  /** Null for a standings row, which carries no scores at all, and for a leaderboard line
+   * whose score cell does not add up. */
   rounds: Rounds | null;
 }
 
