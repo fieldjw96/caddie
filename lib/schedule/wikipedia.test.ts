@@ -92,6 +92,26 @@ describe("fetchArticle", () => {
 
     await expect(callThrough(() => fetchArticle("2026 PGA Tour"))).rejects.toThrow();
   });
+
+  it("decodes HTML entities out of the wikitext it returns", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          parse: {
+            title: "2026 RBC Canadian Open",
+            revid: 1,
+            wikitext: "| course = [[TPC Toronto at Osprey&nbsp;Valley]] (North&nbsp;course)",
+          },
+        }),
+      ),
+    );
+
+    const article = await callThrough(() => fetchArticle("2026 RBC Canadian Open"));
+    expect(article.wikitext).toBe(
+      "| course = [[TPC Toronto at Osprey Valley]] (North course)",
+    );
+  });
 });
 
 describe("fetchIntro", () => {

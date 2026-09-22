@@ -6,6 +6,7 @@
 // is about the process's request rate, not any one caller's.
 
 import { z } from "zod";
+import { decodeHtmlEntities } from "./html-entities";
 
 const USER_AGENT = "Caddie/0.1 (+https://github.com/fieldjw96/caddie) wikipedia-ingest";
 
@@ -47,7 +48,10 @@ const parseWikitextResponseSchema = z.object({
   parse: z.object({
     title: z.string(),
     revid: z.number().int().positive(),
-    wikitext: z.string(),
+    // Decoded once, here, so every caller of fetchArticle/fetchSection/fetchIntro reads plain
+    // text rather than markup: this is the one place this repo takes wikitext from a MediaWiki
+    // response.
+    wikitext: z.string().transform(decodeHtmlEntities),
   }),
 });
 
