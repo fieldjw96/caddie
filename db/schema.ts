@@ -74,7 +74,9 @@ export const players = pgTable(
     /** The Wikidata item, `Q` and digits. The identity every other Source is matched to. */
     wikidataId: text("wikidata_id").notNull(),
     name: text("name").notNull(),
+    country: text("country"),
     dateOfBirth: date("date_of_birth", { mode: "string" }),
+    turnedProfessionalYear: integer("turned_professional_year"),
     ...provenance,
   },
   (t) => [
