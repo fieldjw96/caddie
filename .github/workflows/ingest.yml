@@ -49,8 +49,13 @@ jobs:
     timeout-minutes: 45
     env:
       DATABASE_URL: ${{ secrets.CADDIE_DATABASE_URL }}
-      INGEST_LOG_DIR: ${{ runner.temp }}/ingest-logs
     steps:
+      # `runner.temp` is not available in a job-level `env:` block: the runner context only
+      # exists once a step is running, so using it above makes the whole file unparseable and
+      # every run fails before any job starts, with no log to read. Set here instead, from
+      # RUNNER_TEMP, which is an ordinary environment variable the runner always exports.
+      - name: Put the ingest logs somewhere outside the checkout
+        run: echo "INGEST_LOG_DIR=$RUNNER_TEMP/ingest-logs" >> "$GITHUB_ENV"
       - uses: actions/checkout@v6
         with:
           # Nothing after checkout needs git credentials, and leaving them persisted makes the
