@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { findLeaks, redact, secretsFrom } from "./redact";
 
 // A made-up credential for a host that does not exist.

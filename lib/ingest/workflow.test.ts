@@ -4,6 +4,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import { STAGES } from "./stages";
 
 const workflow = readFileSync(join(process.cwd(), ".github/workflows/ingest.yml"), "utf8");

@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { countRows, emptyTables, type IngestCounts } from "./counts";
 
 // The healthy local run of 2026-09-22.

@@ -42,12 +42,12 @@ function show(line: string, to: NodeJS.WriteStream): void {
 
 // Through a shell on Windows only, where npm is npm.cmd. The script name is one of this repo's
 // own constants, never input.
-const command = ["npm", "run", "--silent", stage.script];
-const options = { stdio: ["ignore", "pipe", "pipe"] } as const;
+const args = ["run", "--silent", stage.script];
+const stdio: ["ignore", "pipe", "pipe"] = ["ignore", "pipe", "pipe"];
 const child =
   process.platform === "win32"
-    ? spawn(command.join(" "), { ...options, shell: true })
-    : spawn(command[0]!, command.slice(1), options);
+    ? spawn(["npm", ...args].join(" "), { stdio, shell: true })
+    : spawn("npm", args, { stdio });
 const streams = [
   new Promise<void>((resolve) =>
     createInterface({ input: child.stdout })
@@ -63,6 +63,8 @@ const streams = [
 
 child.on("error", (error) => {
   show(`Could not start npm run ${stage.script}: ${error.message}`, process.stderr);
+  console.log(`::error title=Ingest stage failed::The ${stage.name} stage could not start.`);
+  process.exitCode = 1;
 });
 
 child.on("close", async (code, signal) => {
