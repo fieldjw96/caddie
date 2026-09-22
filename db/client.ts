@@ -16,5 +16,17 @@ import * as schema from "./schema";
 // one that refused to start. See db/env.ts for the resolution order and why it exists.
 const url = resolveAppDatabaseUrl();
 
-export const client = postgres(url);
+// `prepare: false` is not optional on a pooled Supabase connection, and leaving it out is why
+// production returned 500 on every request while the database was populated and healthy.
+// Supabase's pooler runs in transaction mode: a connection is handed to one transaction and
+// then to somebody else, so a prepared statement created on it is gone by the next query.
+// postgres.js prepares by default, so every query failed. Supabase's own documentation
+// requires this flag for pooled connections.
+//
+// It costs a little speed, and costs nothing at all on a session-mode or direct connection,
+// so it is set unconditionally rather than guessed at from the URL's port: the app always
+// takes the pooled string, and a wrong guess here is a total outage rather than a slow page.
+// db/migration-client.ts deliberately does not set it: it takes the direct connection, where
+// prepared statements work and migrations want them.
+export const client = postgres(url, { prepare: false });
 export const db = drizzle(client, { schema });
