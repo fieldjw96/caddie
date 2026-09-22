@@ -1,5 +1,5 @@
 {
-  "id": "1f7d722a-d542-4adf-855d-b28d816e7862",
+  "id": "451665a0-b4ef-4c93-b2f8-0d6d393efba3",
   "prevId": "9a87eb46-f0a4-4fa9-ab08-f7dd77a8c66c",
   "version": "7",
   "dialect": "postgresql",
@@ -280,7 +280,7 @@
         },
         "courses_holes_trusted_is_the_check": {
           "name": "courses_holes_trusted_is_the_check",
-          "value": "\"courses\".\"holes_trusted\" is null or \"courses\".\"holes_trusted\" = (\n        abs(\"courses\".\"holes_yardage_difference\") <= 0.03 * \"courses\".\"published_yardage\"\n      )"
+          "value": "\"courses\".\"holes_trusted\" is null or \"courses\".\"holes_trusted\" = (\n        abs(\"courses\".\"holes_yardage_difference\") * 100 <= 3 * \"courses\".\"published_yardage\"\n      )"
         }
       },
       "isRLSEnabled": false

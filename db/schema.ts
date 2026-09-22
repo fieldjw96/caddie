@@ -105,18 +105,20 @@ export type CourseHole = {
 };
 
 /**
- * How far a course's hole yardages may sum from its published total before they stop being
- * believed. More than this and `holes_trusted` is false. The database checks the same
- * arithmetic, so the figure appears in `courses_holes_trusted_is_the_check` too.
+ * How far, in percent, a course's hole yardages may sum from its published total before they
+ * stop being believed. More than this and `holes_trusted` is false. A whole number so that the
+ * check is integer arithmetic, in which JavaScript and Postgres cannot disagree at the edge.
+ * The database checks the same arithmetic, so the figure appears in
+ * `courses_holes_trusted_is_the_check` too.
  */
-export const HOLE_YARDAGE_TOLERANCE = 0.03;
+export const HOLE_YARDAGE_TOLERANCE_PERCENT = 3;
 
 /**
  * One golf course, by its own name. It outlives any Tournament held there.
  *
  * `holes_trusted` is the contract with whatever derives Course Traits. It records whether the
  * hole-by-hole yardages, summed, agree with the published total to within
- * HOLE_YARDAGE_TOLERANCE. OpenGolfAPI returns member-tee holes for Augusta, 1,080 yards short
+ * HOLE_YARDAGE_TOLERANCE_PERCENT. OpenGolfAPI returns member-tee holes for Augusta, 1,080 yards short
  * of the card, and a Trait built on those holes would be confidently wrong. A Trait derived
  * from hole yardages must be refused for a course where this is false.
  */
@@ -165,11 +167,11 @@ export const courses = pgTable(
       )`,
     ),
     // The verdict is the arithmetic, and the database recomputes it rather than taking the
-    // ingest code's word for it. 0.03 is HOLE_YARDAGE_TOLERANCE.
+    // ingest code's word for it. The 3 is HOLE_YARDAGE_TOLERANCE_PERCENT.
     check(
       "courses_holes_trusted_is_the_check",
       sql`${t.holesTrusted} is null or ${t.holesTrusted} = (
-        abs(${t.holesYardageDifference}) <= 0.03 * ${t.publishedYardage}
+        abs(${t.holesYardageDifference}) * 100 <= 3 * ${t.publishedYardage}
       )`,
     ),
   ],

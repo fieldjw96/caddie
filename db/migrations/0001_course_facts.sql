@@ -17,5 +17,5 @@ ALTER TABLE "courses" ADD CONSTRAINT "courses_holes_check_is_complete" CHECK ("c
         and "courses"."holes_yardage_difference" = "courses"."holes_yardage_sum" - "courses"."published_yardage"
       ));--> statement-breakpoint
 ALTER TABLE "courses" ADD CONSTRAINT "courses_holes_trusted_is_the_check" CHECK ("courses"."holes_trusted" is null or "courses"."holes_trusted" = (
-        abs("courses"."holes_yardage_difference") <= 0.03 * "courses"."published_yardage"
+        abs("courses"."holes_yardage_difference") * 100 <= 3 * "courses"."published_yardage"
       ));
