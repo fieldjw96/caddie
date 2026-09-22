@@ -54,7 +54,7 @@ function parseNumber(text: string): number | null {
 // A range is written as its own pair of parameters ("{{cvt|160|–|310|ft}}"), not a dash
 // touching the first number, so the optional group matches the whole "|–|second-number" span.
 const CONVERT_TEMPLATE =
-  /\{\{\s*(?:convert|cvt)\s*\|\s*([\d,.]+)\s*(?:\|\s*[-–—]\s*\|\s*([\d,.]+)\s*)?\|\s*(ft|feet|m|metres|meters)\b/i;
+  /\{\{\s*(?:convert|cvt)\s*\|\s*(-?[\d,.]+)\s*(?:\|\s*[-–—]\s*\|\s*(-?[\d,.]+)\s*)?\|\s*(ft|feet|m|metres|meters)\b/i;
 
 /** The number a `{{convert}}`/`{{cvt}}` template gives, in feet, midpoint of a range if given. */
 function feetFromConvertTemplate(text: string): number | null {
@@ -70,12 +70,12 @@ function feetFromConvertTemplate(text: string): number | null {
 
 /** The number a plain "400 ft" / "400 feet" / "122 m" / "122 metres" reads, in feet. */
 function feetFromPlainText(text: string): number | null {
-  const feet = /([\d,.]+)\s*(?:ft|feet)\b/i.exec(text);
+  const feet = /(-?[\d,.]+)\s*(?:ft|feet)\b/i.exec(text);
   if (feet) {
     const n = parseNumber(feet[1]!);
     return n === null ? null : Math.round(n);
   }
-  const metres = /([\d,.]+)\s*(?:m|metres|meters)\b/i.exec(text);
+  const metres = /(-?[\d,.]+)\s*(?:m|metres|meters)\b/i.exec(text);
   if (metres) {
     const n = parseNumber(metres[1]!);
     return n === null ? null : Math.round(n * METRES_TO_FEET);

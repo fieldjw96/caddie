@@ -53,6 +53,16 @@ describe("parseAltitudeFeet", () => {
     expect(parseAltitudeFeet(plain)).toBe(400); // 122 * 3.28084 = 400.26, rounds to 400
   });
 
+  it("keeps the sign on a below-sea-level reading", () => {
+    const belowSeaLevel = `{{Infobox golf facility\n| elevation = {{convert|-30|ft}}\n}}`;
+    expect(parseAltitudeFeet(belowSeaLevel)).toBe(-30);
+  });
+
+  it("keeps the sign on a below-sea-level plain-text reading", () => {
+    const belowSeaLevel = `{{Infobox golf facility\n| elevation = -30 ft\n}}`;
+    expect(parseAltitudeFeet(belowSeaLevel)).toBe(-30);
+  });
+
   it("returns null when the elevation field is commented out", () => {
     expect(parseAltitudeFeet(PEBBLE_BEACH)).toBeNull();
   });
