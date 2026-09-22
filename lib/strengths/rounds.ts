@@ -84,7 +84,12 @@ export const LOW_ROUND_SHARE = 0.1;
 const MISSED_CUT = new Set(["CUT", "MC"]);
 
 /** Four rounds in order, the strokes the Source printed, or null where it printed none. */
-export type RoundScores = readonly [number | null, number | null, number | null, number | null];
+export type RoundScores = readonly [
+  number | null,
+  number | null,
+  number | null,
+  number | null,
+];
 
 /** A stored result with its round scores, as `loadResults` reads it. */
 export interface RoundedResult extends StoredResult {
@@ -104,9 +109,9 @@ export function countedRounds(result: RoundedResult): CountedRound[] {
   if (MISSED_CUT.has(result.finish)) played = 2;
   else if (result.position !== null) played = 4;
   else return [];
-  return result.rounds.slice(0, played).flatMap((strokes, i) =>
-    strokes === null ? [] : [{ round: i + 1, strokes }],
-  );
+  return result.rounds
+    .slice(0, played)
+    .flatMap((strokes, i) => (strokes === null ? [] : [{ round: i + 1, strokes }]));
 }
 
 /** One round's field: every counted score in it, lowest first, and its spread. */
@@ -244,7 +249,9 @@ export function deriveRoundStrengths(
     playerIds.map((id) => [id, rawRoundMeasures(byPlayer.get(id) ?? [], fields)] as const),
   );
   const qualified = [...raw].filter(([, m]) => m.events >= MINIMUM_SAMPLE);
-  const spreads = qualified.flatMap(([id, m]) => (m.spread === null ? [] : [{ id, v: m.spread }]));
+  const spreads = qualified.flatMap(([id, m]) =>
+    m.spread === null ? [] : [{ id, v: m.spread }],
+  );
   const lowRates = qualified.flatMap(([id, m]) =>
     m.lowRate === null ? [] : [{ id, v: m.lowRate }],
   );

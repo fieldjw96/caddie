@@ -80,7 +80,9 @@ async function main(): Promise<void> {
   console.log(
     `Non-null Consistency: ${rounded.filter((s) => s.consistency.value !== null).length}`,
   );
-  console.log(`Non-null Low rounds: ${rounded.filter((s) => s.lowRounds.value !== null).length}`);
+  console.log(
+    `Non-null Low rounds: ${rounded.filter((s) => s.lowRounds.value !== null).length}`,
+  );
   console.log(
     `Nothing at all (every Strength null): ${count(
       (s) => s.skill.value === null && s.form.value === null && s.venueRecord?.value == null,
