@@ -236,7 +236,9 @@ export const tournaments = pgTable(
  * - `standings`: the season article's FedEx Cup standings table, which gives only the top 30
  *   Players' finishes in the majors, signature and playoff events, and no scores at all. A
  *   Player's presence there is conditioned on a good season, so these rows are a biased
- *   sample and must never be read as a field.
+ *   sample and must never be read as a field. Also the season's FedEx Cup Playoffs article,
+ *   each playoff event's finishes for the Players who qualified for it, likewise with no
+ *   scores; its rows' `sourceUrl` is that article, which is how they are told apart.
  */
 export const resultBasis = pgEnum("result_basis", ["leaderboard", "standings"]);
 

@@ -49,9 +49,12 @@ refuses any Trait built on hole yardages for a course whose `holes_trusted` is f
 
     npm run derive:course-traits
 
-Results, from Wikipedia into `results`, for the most recent season with final FedEx Cup
-standings. Needs `ingest:players` first: a name matching no player is reported, never
-created. Idempotent, and about ten requests at one a second:
+Results, from Wikipedia into `results`, for last season and this one: each played major's and
+the Players' own leaderboard, the season's FedEx Cup Playoffs table, and the FedEx Cup
+standings table once the season is over and it exists. A season in progress is read as far
+as it has been played; events still to come are skipped and counted. Needs `ingest:players`
+first: a name matching no player is reported, never created. Idempotent, and about twenty
+requests at one a second. `-- 2025` reads one named season:
 
     npm run ingest:players
     npm run ingest:results

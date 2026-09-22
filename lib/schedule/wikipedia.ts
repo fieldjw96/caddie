@@ -71,8 +71,23 @@ export interface WikitextArticle {
   wikitext: string;
 }
 
-function throwIfMediaWikiError(payload: unknown, context: string): void {
+/**
+ * The article asked for does not exist. Its own type because a caller reading a season in
+ * progress expects some of these, for events nobody has written up yet, and must tell them
+ * apart from a request that failed.
+ */
+export class MissingArticleError extends Error {
+  constructor(readonly page: string) {
+    super(`Wikipedia has no article titled "${page}".`);
+    this.name = "MissingArticleError";
+  }
+}
+
+function throwIfMediaWikiError(payload: unknown, context: string, page?: string): void {
   const asError = mediaWikiErrorSchema.safeParse(payload);
+  if (asError.success && page !== undefined && asError.data.error.code === "missingtitle") {
+    throw new MissingArticleError(page);
+  }
   if (asError.success) {
     throw new Error(
       `MediaWiki API refused ${context}: ${asError.data.error.code} — ${asError.data.error.info}`,
@@ -88,7 +103,7 @@ export async function fetchArticle(page: string): Promise<WikitextArticle> {
     redirects: "1",
     prop: "wikitext|revid",
   });
-  throwIfMediaWikiError(payload, `parse of "${page}"`);
+  throwIfMediaWikiError(payload, `parse of "${page}"`, page);
   const parsed = parseWikitextResponseSchema.parse(payload);
   return parsed.parse;
 }
