@@ -20,13 +20,14 @@ export const DAILY_REQUEST_LIMIT = 500;
 export const MIN_REQUEST_INTERVAL_MS = 1_000;
 
 /**
- * The daily allowance is used up, by this run or by anything else sharing the address. Every
- * later request would fail the same way, so this ends the run rather than one course.
+ * The daily allowance is used up, by this run or by anything else sharing the address, or
+ * too little of it is left for what the run still needs. Every later request would fail the
+ * same way, so this ends the run rather than one course.
  */
 export class RateLimitExhausted extends Error {
   constructor(detail: string) {
     super(
-      `OpenGolfAPI's daily limit of ${DAILY_REQUEST_LIMIT} requests is used up: ${detail}`,
+      `Out of OpenGolfAPI requests, which are limited to ${DAILY_REQUEST_LIMIT} a day: ${detail}`,
     );
     this.name = "RateLimitExhausted";
   }
@@ -72,6 +73,26 @@ export class OpenGolfApiClient {
 
   get requestsSent(): number {
     return this.sent;
+  }
+
+  /** What the server last said is left today, or null before it has said anything. */
+  get remainingToday(): number | null {
+    return this.remaining;
+  }
+
+  /**
+   * Throws RateLimitExhausted unless `count` more requests can be sent, by this client's
+   * budget and by what the server last said remains. For a caller that would rather not start
+   * than stop halfway.
+   */
+  ensure(count: number): void {
+    const left = this.budget - this.sent;
+    const available = this.remaining === null ? left : Math.min(left, this.remaining);
+    if (available < count) {
+      throw new RateLimitExhausted(
+        `${count} more requests are needed and ${available} remain`,
+      );
+    }
   }
 
   /** Fetches `path` and parses its body with `schema`, or throws saying which field failed. */

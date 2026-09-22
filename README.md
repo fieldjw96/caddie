@@ -27,10 +27,21 @@ and enforced in CI, not just written down.
     npm ci
     npm run dev
 
-Course facts, from OpenGolfAPI into the `courses` table at `DATABASE_URL`. Idempotent, and
-about 16 of the 500 requests a day OpenGolfAPI allows:
+The schedule, from Wikipedia into `tournaments`: each Tournament's dates, its Course as its
+own article names it, and its Location. About a request a second:
 
     npm run db:migrate
+    npm run ingest:schedule
+
+Course facts, from OpenGolfAPI into `courses`, for every Tournament of the current season that
+names a Course, and each Tournament's `course_id` set to it. A match is by name within the
+Tournament's state, and only when certain: exact, normalised (case, punctuation, accents and
+words like "Golf Club" ignored), or declared by a person in `lib/courses/match.ts`. Anything
+less is left null and listed at the end of the run with the name as the schedule wrote it.
+Nothing is written until every request has been made, and a run that would need more than
+OpenGolfAPI has left today stops, writes nothing and exits non-zero. Idempotent, and about 80
+of the 500 requests a day:
+
     npm run ingest:courses
 
 Course Traits, derived from the courses just ingested into `course_traits`. Idempotent, and

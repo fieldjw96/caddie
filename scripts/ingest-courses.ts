@@ -1,74 +1,137 @@
-// `npm run ingest:courses` fetches course facts from OpenGolfAPI into `courses`.
+// `npm run ingest:courses` matches every Tournament in the current season's schedule to its
+// Course on OpenGolfAPI, fetches each matched course into `courses`, and sets each
+// Tournament's `course_id` and `course_match`. Needs `ingest:schedule` first: the Course names
+// and Locations it matches are the ones that stored.
 //
-//   npm run ingest:courses                      the eight VENUES in lib/opengolfapi/ingest.ts
-//   npm run ingest:courses -- "Pebble Beach"    only the VENUES whose query or name this is
+// A match is by name, within the Tournament's state where it has one, and only when it is
+// certain; anything less is left null and listed at the end, with the name as the schedule
+// wrote it. See lib/courses/match.ts for the rules.
 //
-// Idempotent: a course is keyed on its OpenGolfAPI id, so a re-run updates the same rows
-// rather than adding any. One course that fails, by changed shape or failed resolution, is
-// reported and skipped; the run carries on, then exits non-zero so the failure is not missed.
-// Running out of daily requests ends the run, because every later request would fail too.
+// Nothing is written until every request has been made. A run that would need more requests
+// than OpenGolfAPI has left today stops, says how far it got, writes nothing and exits
+// non-zero. Idempotent: a re-run upserts the same courses and sets the same matches.
 
-import { eq, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, max } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { courses } from "../db/schema";
+import { courses, tournaments } from "../db/schema";
 import { OpenGolfApiClient } from "../lib/opengolfapi/client";
-import { ingestVenues, VENUES, type Outcome, type Venue } from "../lib/opengolfapi/ingest";
-import { storeCourse } from "../lib/opengolfapi/store";
+import {
+  planCourses,
+  RunStopped,
+  type CoursePlan,
+  type TournamentOutcome,
+} from "../lib/opengolfapi/ingest";
+import { storePlan } from "../lib/opengolfapi/store";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
   throw new Error("DATABASE_URL is not set. See .env.example.");
 }
 
-function selected(args: string[]): Venue[] {
-  if (args.length === 0) return VENUES;
-  const is = (v: Venue, arg: string) =>
-    [v.query, v.name].some((n) => n.toLowerCase() === arg.toLowerCase());
-  const unknown = args.filter((a) => !VENUES.some((v) => is(v, a)));
-  if (unknown.length > 0) {
-    throw new Error(`Not a known venue: ${unknown.join(", ")}. Add it to VENUES first.`);
+function listUnmatched(title: string, outcomes: TournamentOutcome[]) {
+  if (outcomes.length === 0) return;
+  console.log(`\n${title} (${outcomes.length}):`);
+  for (const { tournament, resolution } of outcomes) {
+    if (resolution.status === "matched") continue;
+    console.log(`  ${tournament.name}: "${resolution.scheduleName ?? "(no Course named)"}"`);
+    console.log(`    ${resolution.reason}`);
+    if (resolution.status === "near-miss" && resolution.candidates.length > 0) {
+      console.log(`    search returned: ${resolution.candidates.join(", ")}`);
+    }
   }
-  return VENUES.filter((v) => args.some((a) => is(v, a)));
-}
-
-function report(outcome: Outcome) {
-  if (!outcome.ok) {
-    console.error(`FAIL  ${outcome.venue.query}: ${outcome.error}`);
-    return;
-  }
-  const row = outcome.row;
-  const difference = row.holesYardageDifference ?? 0;
-  const verdict =
-    row.holesTrusted == null
-      ? "holes not checked"
-      : `holes_trusted=${row.holesTrusted}: ${row.holesCheckedTee} holes sum ` +
-        `${row.holesYardageSum} against ${row.publishedYardage} published ` +
-        `(${difference >= 0 ? "+" : ""}${difference})`;
-  console.log(`ok    ${outcome.venue.query} -> ${row.name}: ${verdict}`);
 }
 
 async function main() {
-  const venues = selected(process.argv.slice(2));
   const client = postgres(url!, { max: 1, onnotice: () => {} });
   const db = drizzle(client);
   const api = new OpenGolfApiClient();
 
   try {
-    const outcomes = await ingestVenues(api, venues, (row) => storeCourse(db, row), report);
-    const failed = outcomes.filter((o) => !o.ok).map((o) => o.venue.query);
-    if (failed.length > 0) {
-      console.error(`${failed.length} of ${venues.length} failed: ${failed.join(", ")}`);
+    const [latest] = await db.select({ season: max(tournaments.season) }).from(tournaments);
+    const season = latest?.season;
+    if (season == null) {
+      console.error("No Tournaments are stored. Run `npm run ingest:schedule` first.");
       process.exitCode = 1;
+      return;
     }
-  } finally {
-    const [count] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(courses)
-      .where(eq(courses.source, "opengolfapi"));
+    const scheduled = await db
+      .select({
+        id: tournaments.id,
+        name: tournaments.name,
+        courseName: tournaments.courseName,
+        location: tournaments.location,
+      })
+      .from(tournaments)
+      .where(eq(tournaments.season, season))
+      .orderBy(tournaments.startDate, tournaments.name);
+    const named = scheduled.filter((t) => t.courseName !== null).length;
     console.log(
-      `${api.requestsSent} requests sent. ${count?.n ?? 0} OpenGolfAPI courses stored.`,
+      `Matching the ${season} season: ${scheduled.length} Tournaments, ${named} with a Course name.`,
     );
+
+    let plan: CoursePlan;
+    try {
+      plan = await planCourses(api, scheduled);
+    } catch (error) {
+      if (!(error instanceof RunStopped)) throw error;
+      console.error(error.message);
+      console.error(`${api.requestsSent} requests sent. Nothing was written.`);
+      process.exitCode = 1;
+      return;
+    }
+    await storePlan(db, plan);
+
+    const matched = plan.outcomes.filter((o) => o.resolution.status === "matched");
+    console.log(`\nMatched (${matched.length}):`);
+    for (const { tournament, resolution } of matched) {
+      if (resolution.status !== "matched") continue;
+      console.log(
+        `  ${tournament.name}: "${resolution.scheduleName}" -> ` +
+          `"${resolution.openGolfApiName}" [${resolution.confidence}]`,
+      );
+    }
+    listUnmatched(
+      "Near-misses, left unmatched",
+      plan.outcomes.filter((o) => o.resolution.status === "near-miss"),
+    );
+    listUnmatched(
+      "Failed, left unmatched",
+      plan.outcomes.filter((o) => o.resolution.status === "failed"),
+    );
+
+    console.log("\nCourses fetched:");
+    for (const row of plan.rows) {
+      const verdict =
+        row.holesTrusted == null
+          ? "holes not checked"
+          : `holes_trusted=${row.holesTrusted}: ${row.holesCheckedTee} holes sum ` +
+            `${row.holesYardageSum} against ${row.publishedYardage} published`;
+      console.log(`  ${row.name}: ${verdict}`);
+    }
+    const untrusted = plan.rows.filter((r) => r.holesTrusted === false).length;
+    const unchecked = plan.rows.filter((r) => r.holesTrusted == null).length;
+
+    const [linked] = await db
+      .select({ n: count() })
+      .from(tournaments)
+      .where(and(eq(tournaments.season, season), isNotNull(tournaments.courseId)));
+    const ids = plan.rows.map((r) => r.openGolfApiId!);
+    const [stored] =
+      ids.length === 0
+        ? [{ n: 0 }]
+        : await db
+            .select({ n: count() })
+            .from(courses)
+            .where(inArray(courses.openGolfApiId, ids));
+
+    console.log(
+      `\n${linked?.n ?? 0} of ${scheduled.length} ${season} Tournaments have a course_id ` +
+        `(${named} named a Course). ${stored?.n ?? 0} Courses stored for them: ` +
+        `${untrusted} with untrusted holes, ${unchecked} whose holes could not be checked.`,
+    );
+    console.log(`${api.requestsSent} OpenGolfAPI requests sent.`);
+  } finally {
     await client.end();
   }
 }

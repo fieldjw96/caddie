@@ -39,6 +39,7 @@ beforeAll(async () => {
         pageTitle: `${season} Results Test Open`,
         startDate: "2025-04-10",
         endDate: "2025-04-13",
+        location: null,
         canceled: false,
       },
       {
@@ -46,6 +47,7 @@ beforeAll(async () => {
         pageTitle: "Canceled Classic",
         startDate: "2025-04-17",
         endDate: "2025-04-20",
+        location: null,
         canceled: true,
       },
     ],
@@ -98,6 +100,7 @@ describe("ensureTournaments", () => {
           pageTitle: `${season} Results Test Open`,
           startDate: "2025-04-10",
           endDate: "2025-04-13",
+          location: null,
           canceled: false,
         },
       ],
