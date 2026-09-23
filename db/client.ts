@@ -48,7 +48,14 @@ export function getDb(): Database {
   return connect().db;
 }
 
-/** The postgres.js handle, for the few places that need the driver rather than drizzle. */
+/**
+ * The postgres.js handle, for the few places that need the driver rather than drizzle.
+ *
+ * A function rather than a lazy `client` export on purpose. postgres.js's handle is callable,
+ * used as a tagged template, and a Proxy whose target is a plain object cannot be called at
+ * all: its `apply` trap never fires, so such an export would silently lose that ability while
+ * claiming compatibility. Nothing imports it today, so there is no compatibility to keep.
+ */
 export function getClient(): Client {
   return connect().client;
 }
@@ -69,13 +76,3 @@ export const db: Database = new Proxy({} as Database, {
     return Reflect.has(connect().db as object, property);
   },
 });
-
-/** The driver handle, same laziness. Kept for compatibility with existing imports. */
-export const client: Client = new Proxy({} as Client, {
-  get(_target, property, receiver) {
-    return Reflect.get(connect().client as object, property, receiver);
-  },
-  apply(_target, thisArg, args: unknown[]) {
-    return Reflect.apply(connect().client as never, thisArg, args);
-  },
-}) as Client;
