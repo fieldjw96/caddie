@@ -67,10 +67,19 @@ export function getClient(): Client {
  * and the point of this change is that none of them has to move for the connection to become
  * lazy. Touching a property is the first thing any caller does, and that is where the
  * connection is opened.
+ *
+ * Methods are bound to the real drizzle object, and the receiver is deliberately not
+ * forwarded. Reflecting with the Proxy as receiver would make `this` the Proxy inside every
+ * drizzle method, and drizzle's objects are class instances: the first private field one of
+ * them touches would throw `TypeError: Cannot read private member`, from inside the library,
+ * on a line no call site can see. Binding costs one closure per property read and removes the
+ * whole class of failure.
  */
 export const db: Database = new Proxy({} as Database, {
-  get(_target, property, receiver) {
-    return Reflect.get(connect().db as object, property, receiver);
+  get(_target, property) {
+    const real = connect().db as unknown as Record<string | symbol, unknown>;
+    const value = real[property];
+    return typeof value === "function" ? value.bind(real) : value;
   },
   has(_target, property) {
     return Reflect.has(connect().db as object, property);
