@@ -82,3 +82,61 @@ describe("resolveMigrationDatabaseUrl", () => {
     );
   });
 });
+
+describe("a variable set but blank", () => {
+  // Production served 500 for a day because DATABASE_URL existed in Vercel as an empty string:
+  // `??` kept it, it shadowed a working POSTGRES_URL, and the emptiness check then threw.
+  const clean = () => {
+    delete process.env.DATABASE_URL;
+    delete process.env.POSTGRES_URL;
+    delete process.env.POSTGRES_URL_NON_POOLING;
+  };
+
+  it("falls through to the next variable rather than shadowing it", () => {
+    const previous = { ...process.env };
+    try {
+      clean();
+      process.env.DATABASE_URL = "";
+      process.env.POSTGRES_URL = "postgres://u:p@pooled:6543/db";
+      expect(resolveAppDatabaseUrl()).toBe("postgres://u:p@pooled:6543/db");
+    } finally {
+      Object.assign(process.env, previous);
+    }
+  });
+
+  it("treats whitespace as blank too", () => {
+    const previous = { ...process.env };
+    try {
+      clean();
+      process.env.DATABASE_URL = "   ";
+      process.env.POSTGRES_URL = "postgres://u:p@pooled:6543/db";
+      expect(resolveAppDatabaseUrl()).toBe("postgres://u:p@pooled:6543/db");
+    } finally {
+      Object.assign(process.env, previous);
+    }
+  });
+
+  it("does the same for the migration connection", () => {
+    const previous = { ...process.env };
+    try {
+      clean();
+      process.env.POSTGRES_URL_NON_POOLING = "";
+      process.env.DATABASE_URL = "postgres://u:p@direct:5432/db";
+      expect(resolveMigrationDatabaseUrl()).toBe("postgres://u:p@direct:5432/db");
+    } finally {
+      Object.assign(process.env, previous);
+    }
+  });
+
+  it("still throws when every variable is blank", () => {
+    const previous = { ...process.env };
+    try {
+      clean();
+      process.env.DATABASE_URL = "";
+      process.env.POSTGRES_URL = "  ";
+      expect(() => resolveAppDatabaseUrl()).toThrow(/set but blank/);
+    } finally {
+      Object.assign(process.env, previous);
+    }
+  });
+});
