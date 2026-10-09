@@ -175,6 +175,14 @@ export const courses = pgTable(
   (t) => [
     uniqueIndex("courses_wikidata_id_unique").on(t.wikidataId),
     uniqueIndex("courses_opengolfapi_id_unique").on(t.openGolfApiId),
+    // A Course OpenGolfAPI does not have is keyed on its name instead, because that is the
+    // only identifier the Tournament's own Wikipedia article gives it. Partial, so it says
+    // nothing about the OpenGolfAPI rows, which are keyed on their id and may legitimately
+    // repeat a name. This is the key lib/opengolfapi/store.ts upserts such a Course on, and
+    // therefore the reason a second run of `ingest:courses` adds no row.
+    uniqueIndex("courses_name_unique_without_opengolfapi_id")
+      .on(t.name)
+      .where(sql`${t.openGolfApiId} is null`),
     sourceIsRecorded("courses", t),
     // ODbL requires attribution, so a row from OpenGolfAPI without it cannot be stored.
     check(
@@ -226,10 +234,22 @@ export const courses = pgTable(
  *   "Golf Club", in the same state, and no other course in that state reads the same.
  * - `declared`: a person read both names and wrote the pairing down, in
  *   `DECLARED_MATCHES` in lib/courses/match.ts, because normalising could not settle it.
+ * - `tournament_article`: no name was matched at all, because OpenGolfAPI does not have the
+ *   course. The `courses` row was created from the Tournament's own Wikipedia article, whose
+ *   infobox names the Course and states its par and yardage, so the pairing is not a match
+ *   between two Sources but one Source's own statement of where the Tournament is played.
+ *   OpenGolfAPI is still preferred: this is reached only once a search there has failed.
  *
- * There is no fuzzier level. A match less certain than these is reported and left null.
+ * There is no fuzzier level, and no fuzzier match: the first three are a name matched against
+ * OpenGolfAPI, certainly or not at all, and the fourth is not a name match. A match less
+ * certain than these is reported and left null.
  */
-export const courseMatch = pgEnum("course_match", ["exact", "normalised", "declared"]);
+export const courseMatch = pgEnum("course_match", [
+  "exact",
+  "normalised",
+  "declared",
+  "tournament_article",
+]);
 
 export type CourseMatch = (typeof courseMatch.enumValues)[number];
 
@@ -240,6 +260,14 @@ export type CourseMatch = (typeof courseMatch.enumValues)[number];
  * whether or not it matched; `courseMatch` says how certain the match is, and is present
  * exactly when `courseId` is. `location` is the schedule's Location cell, a state or a
  * country, which a match must agree with.
+ *
+ * `courseName`, `coursePar` and `courseYardage` are the three things the Tournament's own
+ * article states about its venue, read from the one fetch `ingest:schedule` already makes of
+ * that article. They are not a Course: they are what this Tournament's Source says about one,
+ * kept here so a Course OpenGolfAPI does not have can still be created from them. The row's
+ * own `source_url` is the season article, so these carry their own: `courseArticleUrl` is the
+ * Tournament's article at the revision they were read at, and the database refuses a par or a
+ * yardage that has no revision behind it.
  */
 export const tournaments = pgTable(
   "tournaments",
@@ -250,6 +278,12 @@ export const tournaments = pgTable(
     startDate: date("start_date", { mode: "string" }).notNull(),
     endDate: date("end_date", { mode: "string" }).notNull(),
     courseName: text("course_name"),
+    /** The par the Tournament's own article's infobox states, as a whole number of strokes. */
+    coursePar: integer("course_par"),
+    /** The yardage that infobox states, in yards. Never a metric reading, never a sum. */
+    courseYardage: integer("course_yardage"),
+    /** That article at the revision those facts were read at: a permanent link, not a title. */
+    courseArticleUrl: text("course_article_url"),
     location: text("location"),
     courseId: integer("course_id").references(() => courses.id),
     courseMatch: courseMatch("course_match"),
@@ -262,6 +296,15 @@ export const tournaments = pgTable(
     check(
       "tournaments_course_match_is_recorded",
       sql`(${t.courseId} is null) = (${t.courseMatch} is null)`,
+    ),
+    // A Course fact read off the Tournament's article names the revision it was read from, or
+    // it is not stored: a par with nowhere it came from cannot be published, and a `courses`
+    // row built on one would have no `source_url` to carry. `course_name` is exempt by
+    // history, not by principle — rows already hold one from before this column existed.
+    check(
+      "tournaments_course_facts_are_sourced",
+      sql`(${t.coursePar} is null and ${t.courseYardage} is null)
+        or (${t.courseArticleUrl} is not null and btrim(${t.courseArticleUrl}) <> '')`,
     ),
     sourceIsRecorded("tournaments", t),
   ],

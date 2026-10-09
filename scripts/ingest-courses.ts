@@ -14,6 +14,7 @@
 import { and, count, eq, inArray, isNotNull, max } from "drizzle-orm";
 import { client, db } from "../db/migration-client";
 import { courses, tournaments } from "../db/schema";
+import { planNextTournamentCourse } from "../lib/courses/from-tournament";
 import { OpenGolfApiClient } from "../lib/opengolfapi/client";
 import {
   planCourses,
@@ -51,8 +52,12 @@ async function main() {
       .select({
         id: tournaments.id,
         name: tournaments.name,
+        startDate: tournaments.startDate,
         courseName: tournaments.courseName,
         location: tournaments.location,
+        coursePar: tournaments.coursePar,
+        courseYardage: tournaments.courseYardage,
+        courseArticleUrl: tournaments.courseArticleUrl,
       })
       .from(tournaments)
       .where(eq(tournaments.season, season))
@@ -72,7 +77,18 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    await storePlan(db, plan);
+    // OpenGolfAPI first, always: this is reached only for a next Tournament its search could
+    // not match, and it reads facts `ingest:schedule` already stored, so it costs no request.
+    const fromArticle = planNextTournamentCourse(
+      scheduled,
+      new Set(
+        plan.outcomes
+          .filter((o) => o.resolution.status === "matched")
+          .map((o) => o.tournament.id),
+      ),
+      new Date(),
+    );
+    await storePlan(db, plan, fromArticle);
 
     const matched = plan.outcomes.filter((o) => o.resolution.status === "matched");
     console.log(`\nMatched (${matched.length}):`);
@@ -94,6 +110,21 @@ async function main() {
       "Failed, left unmatched",
       plan.outcomes.filter((o) => o.resolution.status === "failed"),
     );
+
+    if (fromArticle !== null) {
+      console.log(
+        `\nThe next Tournament, ${fromArticle.tournamentName}, matched no OpenGolfAPI course.`,
+      );
+      if (fromArticle.status === "created") {
+        console.log(
+          `  Created "${fromArticle.row.name}" from its own Wikipedia article: ` +
+            `par ${fromArticle.row.par}, ${fromArticle.row.publishedYardage} yards, ` +
+            `no holes. ${fromArticle.row.sourceUrl}`,
+        );
+      } else {
+        console.log(`  Skipped: ${fromArticle.reason}.`);
+      }
+    }
 
     console.log("\nCourses fetched:");
     for (const row of plan.rows) {

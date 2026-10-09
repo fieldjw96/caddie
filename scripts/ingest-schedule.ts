@@ -5,7 +5,7 @@
 import { client, db } from "../db/migration-client";
 import {
   buildTournamentRecords,
-  resolveCourseNames,
+  resolveCourseFacts,
   upsertTournaments,
 } from "../lib/schedule/ingest";
 import { parseSchedule } from "../lib/schedule/parse";
@@ -44,20 +44,24 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Resolving each tournament's Course name from its own article, throttled to one request a second (about ${active.length} seconds)...`,
+    `Resolving each tournament's Course, par and yardage from its own article, throttled to one request a second (about ${active.length} seconds)...`,
   );
-  const courseNames = await resolveCourseNames(active.map((row) => row.pageTitle));
+  const courseFacts = await resolveCourseFacts(active.map((row) => row.pageTitle));
 
   const sourceUrl = revisionUrl(section.title, section.revid);
-  const records = buildTournamentRecords(rows, season, sourceUrl, courseNames);
+  const records = buildTournamentRecords(rows, season, sourceUrl, courseFacts);
 
   await upsertTournaments(db, records);
 
   const withCourse = records.filter((record) => record.courseName !== null).length;
+  const withFacts = records.filter(
+    (record) => record.coursePar !== null && record.courseYardage !== null,
+  ).length;
   console.log(`Wrote ${records.length} tournaments for the ${season} season.`);
   console.log(`Source: ${sourceUrl}`);
   console.log(
-    `${withCourse} of ${records.length} resolved a Course name from their own article.`,
+    `${withCourse} of ${records.length} resolved a Course name from their own article, ` +
+      `${withFacts} its par and yardage too.`,
   );
 
   await client.end();
