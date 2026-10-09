@@ -165,17 +165,15 @@ export interface TournamentRef {
 }
 
 /**
- * One venue every Tournament in `tournaments` is played on, and the `courses` row it is.
- * Exactly one of `row` and `reuse` is set: `row` to write a Course this run is the first to
- * know about, `reuse` to point at one already accounted for.
+ * One venue, the `courses` row it is, and every Tournament played on it. Either a Course to
+ * store, this run being the first to know of it, or one already accounted for to point at —
+ * never both, and never neither, which is why this is a union rather than two nullable fields.
  */
-export interface ArticleVenue {
+export type ArticleVenue = {
   /** The venue as the article of the first of these Tournaments names it. */
   name: string;
-  row: CourseRow | null;
-  reuse: KnownCourse | null;
   tournaments: TournamentRef[];
-}
+} & ({ reuse: null; row: CourseRow } | { reuse: KnownCourse; row: null });
 
 /** A Tournament whose article supports no Course, and the reason, in words a person can check. */
 export interface TournamentCourseSkip {
@@ -193,7 +191,12 @@ export interface ArticleCoursePlan {
  * What makes two names one venue: lib/courses/match.ts's own reading, the words that identify
  * a course once case, accents, punctuation and words like "Golf Club" are set aside. This is
  * the `normalised` tier of an OpenGolfAPI match, called rather than restated, so "The Riviera
- * Country Club" and "Riviera CC" cannot end up as two rows.
+ * Country Club" and "Riviera Country Club" cannot end up as two rows.
+ *
+ * It is that rule and no more: an abbreviation is a distinctive word, so "Riviera CC" reads as
+ * a venue of its own and would be stored as one. Widening the rule here would be a second
+ * implementation of it, and the two would drift; widening `GENERIC_WORDS` in match.ts widens
+ * what an OpenGolfAPI match will accept too, which is a judgement of its own.
  *
  * A name of nothing but generic words — "The Golf Club" — has no distinctive words at all, and
  * falls back to the whole normalised name rather than keying every such venue alike.
@@ -275,9 +278,8 @@ export function planArticleCourses(
     const [only] = stored;
     venues.set(key, {
       name: outcome.row.name,
-      row: only ? null : outcome.row,
-      reuse: only ?? null,
       tournaments: [ref],
+      ...(only ? { reuse: only, row: null } : { reuse: null, row: outcome.row }),
     });
   }
 

@@ -64,9 +64,9 @@ function reportArticleCourses(fromArticles: ArticleCoursePlan) {
           `reused rather than stored again: ${where}`,
       );
     } else {
+      const { name, par, publishedYardage, sourceUrl } = venue.row;
       console.log(
-        `  Created "${venue.row!.name}": par ${venue.row!.par}, ` +
-          `${venue.row!.publishedYardage} yards, no holes. ${venue.row!.sourceUrl}`,
+        `  Created "${name}": par ${par}, ${publishedYardage} yards, no holes. ${sourceUrl}`,
       );
       console.log(`    played by: ${where}`);
     }

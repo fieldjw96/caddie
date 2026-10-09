@@ -126,7 +126,7 @@ export async function storePlan<TSchema extends Record<string, unknown>>(
     for (const venue of fromArticles.venues) {
       const courseId = venue.reuse
         ? idOf(venue.reuse)
-        : await storeCourseByName(tx, venue.row!);
+        : await storeCourseByName(tx, venue.row);
       await tx
         .update(tournaments)
         .set({ courseId, courseMatch: "tournament_article" })
