@@ -9,11 +9,15 @@
 # fresher answer. 06:17 is after OpenGolfAPI's daily allowance resets at 00:00 UTC, off the
 # hour when everyone else's cron fires, and before a European morning reads the page.
 #
-# OpenGolfAPI allows 500 anonymous requests a day and a run needs about 80, all from the
-# courses stage. That stage checks what it needs against what is left before it asks, reads
-# the server's own remaining count as it goes, and if it would run out it stops, writes
-# nothing and fails: a table is never half filled. `concurrency` below means a manual run
-# queues behind a scheduled one rather than both spending the same allowance at once.
+# OpenGolfAPI allows 500 anonymous requests a day and a run needs about 100, all from the
+# courses stage, which matches every stored season rather than only the current one. Two
+# seasons' schedules name mostly the same venues, so the second season costs a dozen searches
+# rather than another season's worth. That stage checks what it needs against what is left
+# before it asks — at most three requests for each distinct Course name, about 160 of the 500
+# for the two seasons stored today — reads the server's own remaining count as it goes, and if
+# it would run out it stops, writes nothing and fails: a table is never half filled.
+# `concurrency` below means a manual run queues behind a scheduled one rather than both
+# spending the same allowance at once.
 #
 # The connection string is the repository secret CADDIE_DATABASE_URL and nothing else. It
 # reaches the scripts as DATABASE_URL, the name db/client.ts and drizzle.config.ts read. It is

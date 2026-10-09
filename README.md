@@ -44,7 +44,7 @@ under that name is created from the Tournament's own article instead, from the p
 pointed at that row rather than stored twice. Anything less is left null and listed at the end
 of the run with the name as the schedule wrote it. Nothing is written until every request has
 been made, and a run that would need more than OpenGolfAPI has left today stops, writes nothing
-and exits non-zero. Idempotent, and about 170 of the 500 requests a day:
+and exits non-zero. Idempotent, and about 100 of the 500 requests a day:
 
     npm run ingest:courses
 
