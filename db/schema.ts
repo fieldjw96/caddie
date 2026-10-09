@@ -235,9 +235,12 @@ export const courses = pgTable(
  * - `declared`: a person read both names and wrote the pairing down, in
  *   `DECLARED_MATCHES` in lib/courses/match.ts, because normalising could not settle it.
  * - `tournament_article`: no name was matched at all, because OpenGolfAPI does not have the
- *   course. The `courses` row was created from the Tournament's own Wikipedia article, whose
- *   infobox names the Course and states its par and yardage, so the pairing is not a match
- *   between two Sources but one Source's own statement of where the Tournament is played.
+ *   course under the name the schedule gives it. The pairing comes from the Tournament's own
+ *   Wikipedia article, whose infobox names the Course and states its par and yardage, so it is
+ *   not a match between two Sources but one Source's own statement of where the Tournament is
+ *   played. Usually the `courses` row was created from that article; it can also be a row
+ *   already stored, OpenGolfAPI's included, that the named venue reads as — the row's own
+ *   `source` says which, and this column says only how the Tournament reached it.
  *   OpenGolfAPI is still preferred: this is reached only once a search there has failed.
  *
  * There is no fuzzier level, and no fuzzier match: the first three are a name matched against

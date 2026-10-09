@@ -7,10 +7,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, describe, expect, it } from "vitest";
 import { courses, tournaments } from "../../db/schema";
-import {
-  planTournamentArticleCourse,
-  type TournamentCourseOutcome,
-} from "../courses/from-tournament";
+import { planArticleCourses } from "../courses/from-tournament";
 import augusta from "./fixtures/augusta-national.detail.json";
 import { toCourseRow, type CoursePlan, type CourseRow } from "./ingest";
 import { courseResponse, parse } from "./schema";
@@ -214,9 +211,12 @@ describe("storePlan", () => {
   });
 });
 
-describe("storePlan, for a Course created from the next Tournament's own article", () => {
+describe("storePlan, for a Course created from a Tournament's own article", () => {
   /** One Tournament, unmatched by OpenGolfAPI, with the facts its own article stated. */
-  async function unmatchedTournament(name: string) {
+  async function unmatchedTournament(
+    name: string,
+    courseName = `Yokohama Country Club ${run}`,
+  ) {
     const [inserted] = await db
       .insert(tournaments)
       .values({
@@ -224,7 +224,7 @@ describe("storePlan, for a Course created from the next Tournament's own article
         season: 2026,
         startDate: "2026-10-11",
         endDate: "2026-10-14",
-        courseName: `Yokohama Country Club ${run}`,
+        courseName,
         coursePar: 71,
         courseYardage: 7315,
         courseArticleUrl: "https://en.wikipedia.org/w/index.php?title=X&oldid=1",
@@ -245,19 +245,21 @@ describe("storePlan, for a Course created from the next Tournament's own article
     return inserted!;
   }
 
-  const unmatchedPlan = (id: number, name: string): CoursePlan => ({
-    outcomes: [
-      {
-        tournament: { id, name, courseName: null, location: "Japan" },
-        resolution: {
-          status: "near-miss",
-          scheduleName: "Yokohama Country Club",
-          reason: "no course outside the US reads as this name",
-          candidates: ["YOKOHAMA SPORTS COMPLEX (no state)"],
-        },
+  /** Every Tournament here is one OpenGolfAPI searched for and could not be sure of. */
+  const unmatchedPlan = (
+    tournamentsInIt: readonly { id: number; name: string }[],
+    rows: CourseRow[] = [],
+  ): CoursePlan => ({
+    outcomes: tournamentsInIt.map((t) => ({
+      tournament: { id: t.id, name: t.name, courseName: null, location: "Japan" },
+      resolution: {
+        status: "near-miss",
+        scheduleName: "Yokohama Country Club",
+        reason: "no course outside the US reads as this name",
+        candidates: ["YOKOHAMA SPORTS COMPLEX (no state)"],
       },
-    ],
-    rows: [],
+    })),
+    rows,
   });
 
   const linkOf = async (id: number) =>
@@ -273,13 +275,18 @@ describe("storePlan, for a Course created from the next Tournament's own article
 
   it("creates the Course, links the Tournament, and adds no row on a second run", async () => {
     const t = await unmatchedTournament("Baycurrent Classic");
-    const plan = unmatchedPlan(t.id, t.name);
-    const fromArticle = planTournamentArticleCourse(t);
-    expect(fromArticle.status).toBe("created");
+    const plan = unmatchedPlan([t]);
+    const fromArticles = planArticleCourses([t], new Set(), []);
+    expect(fromArticles.venues[0]?.row).not.toBeNull();
 
-    await storePlan(db, plan, fromArticle);
+    await storePlan(db, plan, fromArticles);
     const first = await linkOf(t.id);
-    await storePlan(db, plan, fromArticle);
+    // The second run sees what the first stored, and points at it rather than storing again.
+    const again = planArticleCourses([t], new Set(), [
+      { courseId: first.courseId, openGolfApiId: null, name: `Yokohama Country Club ${run}` },
+    ]);
+    expect(again.venues[0]?.row).toBeNull();
+    await storePlan(db, plan, again);
 
     const stored = await namedCourses(`Yokohama Country Club ${run}`);
     expect(stored).toHaveLength(1);
@@ -296,17 +303,33 @@ describe("storePlan, for a Course created from the next Tournament's own article
     expect(await linkOf(t.id)).toEqual(first);
   });
 
+  // The join a venue record is: two editions at one venue, one `courses` row, so one Player's
+  // results at the first are results at the second's Course.
+  it("links every Tournament at one venue to the one row", async () => {
+    const name = `Pinehurst ${run}`;
+    const first = await unmatchedTournament("Pinehurst Open", name);
+    const second = await unmatchedTournament("Pinehurst Open II", `The ${name} Country Club`);
+
+    const fromArticles = planArticleCourses([first, second], new Set(), []);
+    expect(fromArticles.venues).toHaveLength(1);
+    await storePlan(db, unmatchedPlan([first, second]), fromArticles);
+
+    const linked = [await linkOf(first.id), await linkOf(second.id)];
+    expect(linked[0]!.courseId).toBe(linked[1]!.courseId);
+    expect(linked[0]).toMatchObject({ match: "tournament_article" });
+  });
+
   it("leaves the Course linked when a later run cannot rebuild it", async () => {
     const t = await unmatchedTournament("Baycurrent Classic II");
-    const plan = unmatchedPlan(t.id, t.name);
-    await storePlan(db, plan, planTournamentArticleCourse(t));
+    const plan = unmatchedPlan([t]);
+    await storePlan(db, plan, planArticleCourses([t], new Set(), []));
     const linked = await linkOf(t.id);
     expect(linked.match).toBe("tournament_article");
 
     // The article now states no par: a skip, not a failure, and not a reason to blank the
     // page by clearing a Course an earlier run created from that same article.
-    const skipped = planTournamentArticleCourse({ ...t, coursePar: null });
-    expect(skipped.status).toBe("skipped");
+    const skipped = planArticleCourses([{ ...t, coursePar: null }], new Set(), []);
+    expect(skipped.skipped).toHaveLength(1);
     await storePlan(db, plan, skipped);
 
     expect(await linkOf(t.id)).toEqual(linked);
@@ -320,29 +343,50 @@ describe("storePlan, for a Course created from the next Tournament's own article
       .set({ courseId: staleCourse, courseMatch: "normalised" })
       .where(eq(tournaments.id, t.id));
 
-    const skipped: TournamentCourseOutcome = {
-      status: "skipped",
-      tournamentId: t.id,
-      tournamentName: t.name,
-      reason: "a test",
-    };
-    await storePlan(db, unmatchedPlan(t.id, t.name), skipped);
+    const skipped = planArticleCourses([{ ...t, coursePar: null }], new Set(), []);
+    expect(skipped.venues).toEqual([]);
+    await storePlan(db, unmatchedPlan([t]), skipped);
 
     expect(await linkOf(t.id)).toMatchObject({ courseId: null, match: null });
   });
 
-  it("never updates a Course OpenGolfAPI provided, whatever it is called", async () => {
-    const t = await unmatchedTournament("Baycurrent Classic IV");
+  // The second way one venue becomes two rows, and the one normalising has to catch: a Course
+  // OpenGolfAPI already holds, named differently in a Tournament's own article.
+  it("points at a Course OpenGolfAPI provided rather than storing a second", async () => {
+    const t = await unmatchedTournament(
+      "Baycurrent Classic IV",
+      `The Yokohama Golf Club ${run}`,
+    );
     const fromOpenGolfApi = row({ name: `Yokohama Country Club ${run}` });
-    const openGolfApiId = await storeCourse(db, fromOpenGolfApi);
+    const courseId = await storeCourse(db, fromOpenGolfApi);
 
-    await storePlan(db, unmatchedPlan(t.id, t.name), planTournamentArticleCourse(t));
+    const fromArticles = planArticleCourses([t], new Set(), [
+      { courseId, openGolfApiId: fromOpenGolfApi.openGolfApiId!, name: fromOpenGolfApi.name },
+    ]);
+    expect(fromArticles.venues[0]?.reuse?.courseId).toBe(courseId);
+    await storePlan(db, unmatchedPlan([t]), fromArticles);
 
-    const stored = await namedCourses(`Yokohama Country Club ${run}`);
-    expect(stored).toHaveLength(2);
-    expect(stored.filter((c) => c.id === openGolfApiId)[0]).toMatchObject({
-      source: "opengolfapi",
-      openGolfApiId: fromOpenGolfApi.openGolfApiId,
+    expect(await linkOf(t.id)).toMatchObject({ courseId, match: "tournament_article" });
+    // Untouched, and no article-sourced twin of it beside it.
+    expect(await namedCourses(fromOpenGolfApi.name)).toHaveLength(1);
+    expect(await namedCourses(`The Yokohama Golf Club ${run}`)).toEqual([]);
+  });
+
+  it("points at a Course this same run is about to fetch, once it has an id", async () => {
+    const t = await unmatchedTournament("Baycurrent Classic V", `The Shinnecock Club ${run}`);
+    const fetched = row({ name: `Shinnecock ${run}` });
+
+    const fromArticles = planArticleCourses([t], new Set(), [
+      { courseId: null, openGolfApiId: fetched.openGolfApiId!, name: fetched.name },
+    ]);
+    expect(fromArticles.venues[0]).toMatchObject({ row: null });
+    await storePlan(db, unmatchedPlan([t], [fetched]), fromArticles);
+
+    const [stored] = await namedCourses(fetched.name);
+    expect(stored?.source).toBe("opengolfapi");
+    expect(await linkOf(t.id)).toMatchObject({
+      courseId: stored!.id,
+      match: "tournament_article",
     });
   });
 });
