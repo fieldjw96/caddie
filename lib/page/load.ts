@@ -127,6 +127,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
       ? null
       : {
           name: courseRow.name,
+          source: courseRow.source,
           architect: courseRow.architect,
           sourceUrl: courseRow.sourceUrl,
           attribution: courseRow.attribution,

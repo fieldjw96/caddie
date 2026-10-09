@@ -3,6 +3,7 @@
 // every gap the page discloses is testable against a fixture. See docs/adr/0002 for why the
 // gaps are shown rather than hidden: the product's claim is that it shows its working.
 
+import type { Source } from "../../db/schema";
 import type { FitCourseTraits, FitTraitName } from "../fit";
 
 /** One Strength as the page shows it: the value, and always the sample it rests on. */
@@ -39,6 +40,12 @@ export interface TournamentView {
 /** The stored facts about the Course the page needs, including the working of the hole check. */
 export interface CourseView {
   name: string;
+  /**
+   * Where the Course itself came from: `opengolfapi` for one matched there, `wikipedia` for
+   * one created from the Tournament's own article because OpenGolfAPI does not have it. The
+   * page says which, because a gap's reason depends on which Source left it.
+   */
+  source: Source;
   architect: string | null;
   sourceUrl: string | null;
   attribution: string | null;
@@ -122,6 +129,13 @@ const yards = (n: number) => `${Math.round(n).toLocaleString("en-US")} yards`;
  */
 export function holesUnavailableReason(course: CourseView | null): string {
   if (course === null) return "No Course is matched to this Tournament.";
+  // A Course OpenGolfAPI does not have at all, read from the Tournament's own Wikipedia
+  // article: that article states a published total, never a card, so there is no hole-by-hole
+  // data to check rather than some that failed a check. Saying OpenGolfAPI "gave no hole
+  // data" would name the wrong Source for the gap.
+  if (course.source === "wikipedia") {
+    return "Not shown: this Course comes from the Tournament's own Wikipedia article, which states a published total rather than a hole-by-hole card.";
+  }
   if (course.holesTrusted === false) {
     const sum = course.holesYardageSum;
     const published = course.publishedYardage;
