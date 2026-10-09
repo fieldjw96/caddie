@@ -7,6 +7,10 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, describe, expect, it } from "vitest";
 import { courses, tournaments } from "../../db/schema";
+import {
+  planTournamentArticleCourse,
+  type TournamentCourseOutcome,
+} from "../courses/from-tournament";
 import augusta from "./fixtures/augusta-national.detail.json";
 import { toCourseRow, type CoursePlan, type CourseRow } from "./ingest";
 import { courseResponse, parse } from "./schema";
@@ -50,6 +54,8 @@ afterAll(async () => {
     await db.delete(tournaments).where(inArray(tournaments.id, tournamentIds));
   }
   await client`delete from courses where opengolfapi_id like ${`${run}-%`}`;
+  // A Course created from a Tournament's article has no OpenGolfAPI id to be found by.
+  await client`delete from courses where name like ${`%${run}%`}`;
   await client.end();
 });
 
@@ -205,5 +211,138 @@ describe("storePlan", () => {
         "tournaments_course_match_is_recorded",
       );
     }
+  });
+});
+
+describe("storePlan, for a Course created from the next Tournament's own article", () => {
+  /** One Tournament, unmatched by OpenGolfAPI, with the facts its own article stated. */
+  async function unmatchedTournament(name: string) {
+    const [inserted] = await db
+      .insert(tournaments)
+      .values({
+        name: `${name} ${run}`,
+        season: 2026,
+        startDate: "2026-10-11",
+        endDate: "2026-10-14",
+        courseName: `Yokohama Country Club ${run}`,
+        coursePar: 71,
+        courseYardage: 7315,
+        courseArticleUrl: "https://en.wikipedia.org/w/index.php?title=X&oldid=1",
+        location: "Japan",
+        source: "wikipedia" as const,
+        sourceUrl: "https://en.wikipedia.org/wiki/2026_PGA_Tour",
+      })
+      .returning({
+        id: tournaments.id,
+        name: tournaments.name,
+        startDate: tournaments.startDate,
+        courseName: tournaments.courseName,
+        coursePar: tournaments.coursePar,
+        courseYardage: tournaments.courseYardage,
+        courseArticleUrl: tournaments.courseArticleUrl,
+      });
+    tournamentIds.push(inserted!.id);
+    return inserted!;
+  }
+
+  const unmatchedPlan = (id: number, name: string): CoursePlan => ({
+    outcomes: [
+      {
+        tournament: { id, name, courseName: null, location: "Japan" },
+        resolution: {
+          status: "near-miss",
+          scheduleName: "Yokohama Country Club",
+          reason: "no course outside the US reads as this name",
+          candidates: ["YOKOHAMA SPORTS COMPLEX (no state)"],
+        },
+      },
+    ],
+    rows: [],
+  });
+
+  const linkOf = async (id: number) =>
+    (
+      await db
+        .select({ courseId: tournaments.courseId, match: tournaments.courseMatch })
+        .from(tournaments)
+        .where(eq(tournaments.id, id))
+    )[0]!;
+
+  const namedCourses = async (name: string) =>
+    db.select().from(courses).where(eq(courses.name, name));
+
+  it("creates the Course, links the Tournament, and adds no row on a second run", async () => {
+    const t = await unmatchedTournament("Baycurrent Classic");
+    const plan = unmatchedPlan(t.id, t.name);
+    const fromArticle = planTournamentArticleCourse(t);
+    expect(fromArticle.status).toBe("created");
+
+    await storePlan(db, plan, fromArticle);
+    const first = await linkOf(t.id);
+    await storePlan(db, plan, fromArticle);
+
+    const stored = await namedCourses(`Yokohama Country Club ${run}`);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({
+      openGolfApiId: null,
+      par: 71,
+      publishedYardage: 7315,
+      source: "wikipedia",
+      holes: null,
+      holesTrusted: null,
+      tees: null,
+    });
+    expect(first).toMatchObject({ courseId: stored[0]!.id, match: "tournament_article" });
+    expect(await linkOf(t.id)).toEqual(first);
+  });
+
+  it("leaves the Course linked when a later run cannot rebuild it", async () => {
+    const t = await unmatchedTournament("Baycurrent Classic II");
+    const plan = unmatchedPlan(t.id, t.name);
+    await storePlan(db, plan, planTournamentArticleCourse(t));
+    const linked = await linkOf(t.id);
+    expect(linked.match).toBe("tournament_article");
+
+    // The article now states no par: a skip, not a failure, and not a reason to blank the
+    // page by clearing a Course an earlier run created from that same article.
+    const skipped = planTournamentArticleCourse({ ...t, coursePar: null });
+    expect(skipped.status).toBe("skipped");
+    await storePlan(db, plan, skipped);
+
+    expect(await linkOf(t.id)).toEqual(linked);
+  });
+
+  it("still clears a stale OpenGolfAPI match when the fallback is skipped", async () => {
+    const t = await unmatchedTournament("Baycurrent Classic III");
+    const staleCourse = await storeCourse(db, row());
+    await db
+      .update(tournaments)
+      .set({ courseId: staleCourse, courseMatch: "normalised" })
+      .where(eq(tournaments.id, t.id));
+
+    const skipped: TournamentCourseOutcome = {
+      status: "skipped",
+      tournamentId: t.id,
+      tournamentName: t.name,
+      reason: "a test",
+    };
+    await storePlan(db, unmatchedPlan(t.id, t.name), skipped);
+
+    expect(await linkOf(t.id)).toMatchObject({ courseId: null, match: null });
+  });
+
+  it("never updates a Course OpenGolfAPI provided, whatever it is called", async () => {
+    const t = await unmatchedTournament("Baycurrent Classic IV");
+    const fromOpenGolfApi = row({ name: `Yokohama Country Club ${run}` });
+    const openGolfApiId = await storeCourse(db, fromOpenGolfApi);
+
+    await storePlan(db, unmatchedPlan(t.id, t.name), planTournamentArticleCourse(t));
+
+    const stored = await namedCourses(`Yokohama Country Club ${run}`);
+    expect(stored).toHaveLength(2);
+    expect(stored.filter((c) => c.id === openGolfApiId)[0]).toMatchObject({
+      source: "opengolfapi",
+      openGolfApiId: fromOpenGolfApi.openGolfApiId,
+    });
   });
 });
