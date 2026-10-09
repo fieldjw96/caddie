@@ -35,14 +35,23 @@ export function checkRankable(input: RankableInput): RankableResult {
   if (next === null) return { ok: true };
 
   if (next.courseId === null) {
-    const courseName = next.courseName ?? "a Course the schedule did not name";
+    if (next.courseName === null) {
+      return {
+        ok: false,
+        reason:
+          `Next Tournament: ${next.name}. The schedule recorded no Course name for it at ` +
+          "all, so none can be matched to a `courses` row. That is the condition that " +
+          "renders zero Player rows: find why `npm run ingest:schedule` read no venue for " +
+          "this Tournament.",
+      };
+    }
     return {
       ok: false,
       reason:
-        `Next Tournament: ${next.name}. Its Course, ${courseName} as the schedule recorded ` +
-        "it, is not matched to a `courses` row. That is the condition that renders zero " +
-        `Player rows: match ${courseName} to a \`courses\` row (\`npm run ingest:courses\` ` +
-        "matches it by this name) before the next run.",
+        `Next Tournament: ${next.name}. Its Course, ${next.courseName} as the schedule ` +
+        "recorded it, is not matched to a `courses` row. That is the condition that " +
+        `renders zero Player rows: match ${next.courseName} to a \`courses\` row (\`npm run ` +
+        "ingest:courses` matches it by this name) before the next run.",
     };
   }
 
