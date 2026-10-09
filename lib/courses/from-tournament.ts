@@ -158,10 +158,15 @@ export interface KnownCourse {
   name: string;
 }
 
-/** One Tournament pointed at a venue, named so a report can say which. */
+/**
+ * One Tournament pointed at a venue, named so a report can say which. The start date is in it
+ * because the same Tournament is in every season: without a year, a report of two editions at
+ * one venue reads as the same name printed twice.
+ */
 export interface TournamentRef {
   id: number;
   name: string;
+  startDate: string;
 }
 
 /**
@@ -256,7 +261,11 @@ export function planArticleCourses(
       });
       continue;
     }
-    const ref = { id: tournament.id, name: tournament.name };
+    const ref = {
+      id: tournament.id,
+      name: tournament.name,
+      startDate: tournament.startDate,
+    };
     const key = venueKey(outcome.row.name);
     const already = venues.get(key);
     if (already) {

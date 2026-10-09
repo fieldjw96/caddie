@@ -56,7 +56,9 @@ function reportArticleCourses(fromArticles: ArticleCoursePlan) {
       `${played} Tournaments OpenGolfAPI could not match, ${skipped.length} skipped.`,
   );
   for (const venue of venues) {
-    const where = venue.tournaments.map((t) => t.name).join(", ");
+    const where = venue.tournaments
+      .map((t) => `${t.name} (${t.startDate.slice(0, 4)})`)
+      .join(", ");
     if (venue.reuse) {
       console.log(
         `  "${venue.name}" is the stored Course "${venue.reuse.name}" ` +
@@ -131,7 +133,7 @@ async function main() {
       })
       .from(courses);
     const known = new Map<string, KnownCourse>(
-      stored.map((c, i) => [c.openGolfApiId ?? `course:${i}`, c]),
+      stored.map((c) => [c.openGolfApiId ?? `courses.id ${c.courseId}`, c]),
     );
     for (const row of plan.rows) {
       known.set(row.openGolfApiId!, {

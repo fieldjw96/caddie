@@ -72,6 +72,17 @@ async function main(): Promise<void> {
   console.log(`Non-null Skill: ${count((s) => s.skill.value !== null)}`);
   console.log(`Non-null Form: ${count((s) => s.form.value !== null)}`);
   console.log(`Non-null venue record: ${count((s) => s.venueRecord?.value != null)}`);
+  // The sample, beside the value, because they fail for different reasons and only one of them
+  // is about the Course links. A sample of zero everywhere means no past Tournament points at
+  // this Course and `ingest:courses` is where to look; a sample under the minimum means the
+  // links are made and the openly-licensed result history is not yet deep enough to state a
+  // number from — which is what the page prints as "no record", beside the count it rests on.
+  const sampled = count((s) => (s.venueRecord?.sampleSize ?? 0) > 0);
+  const deepest = Math.max(0, ...all.map((s) => s.venueRecord?.sampleSize ?? 0));
+  console.log(
+    `Players with any stored result at that Course: ${sampled}, the most any one has being ` +
+      `${deepest}. A venue record needs ${MINIMUM_SAMPLE} to state a number.`,
+  );
   const rounded = [...fromRounds.values()];
   const withRounds = rounded.filter((s) => s.consistency.sampleSize > 0).length;
   console.log(

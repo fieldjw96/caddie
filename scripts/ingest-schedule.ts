@@ -29,7 +29,6 @@ interface SeasonOutcome {
   written: number;
   withCourse: number;
   withFacts: number;
-  sourceUrl: string;
 }
 
 /**
@@ -75,7 +74,7 @@ async function ingestSeason(season: number): Promise<SeasonOutcome | null> {
     `${withCourse} of ${records.length} resolved a Course name from their own article, ` +
       `${withFacts} its par and yardage too.`,
   );
-  return { season, written: records.length, withCourse, withFacts, sourceUrl };
+  return { season, written: records.length, withCourse, withFacts };
 }
 
 async function main(): Promise<void> {
@@ -101,8 +100,13 @@ async function main(): Promise<void> {
     // The current season is the one the page renders, so its schedule is the run. A past
     // season's is history: losing it costs a venue record its depth, which the ingest's own
     // report counts, and is not a reason to leave the site without a next Tournament.
+    // Seasons are read oldest first, so a current season refused here leaves whatever the
+    // past ones wrote in place — good rows, and none of them the reason this failed.
     if (season === current) {
-      console.error(`${season} is the current season, so nothing else was read.`);
+      console.error(
+        `${season} is the current season, so this run fails here. ` +
+          `${outcomes.length} past season${outcomes.length === 1 ? "" : "s"} were written.`,
+      );
       process.exitCode = 1;
       return;
     }

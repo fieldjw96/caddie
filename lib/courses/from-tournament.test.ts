@@ -189,7 +189,7 @@ describe("planArticleCourses", () => {
 
     expect(plan.venues).toHaveLength(1);
     expect(plan.venues[0]?.tournaments).toEqual([
-      { id: 51, name: "Butterfield Bermuda Championship" },
+      { id: 51, name: "Butterfield Bermuda Championship", startDate: "2026-10-25" },
     ]);
   });
 
@@ -212,7 +212,7 @@ describe("planArticleCourses", () => {
     expect(plan.venues[0]?.row).toBeNull();
     expect(plan.venues[0]?.reuse).toMatchObject({ courseId: 7 });
     expect(plan.venues[0]?.tournaments).toEqual([
-      { id: 20, name: "Baycurrent Classic (2025)" },
+      { id: 20, name: "Baycurrent Classic (2025)", startDate: "2025-10-12" },
     ]);
   });
 
