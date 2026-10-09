@@ -353,11 +353,8 @@ describe("storePlan, for a Course created from a Tournament's own article", () =
   // The second way one venue becomes two rows, and the one normalising has to catch: a Course
   // OpenGolfAPI already holds, named differently in a Tournament's own article.
   it("points at a Course OpenGolfAPI provided rather than storing a second", async () => {
-    const t = await unmatchedTournament(
-      "Baycurrent Classic IV",
-      `The Yokohama Golf Club ${run}`,
-    );
-    const fromOpenGolfApi = row({ name: `Yokohama Country Club ${run}` });
+    const t = await unmatchedTournament("Doral Open", `The Doral Golf Club ${run}`);
+    const fromOpenGolfApi = row({ name: `Doral ${run}` });
     const courseId = await storeCourse(db, fromOpenGolfApi);
 
     const fromArticles = planArticleCourses([t], new Set(), [
@@ -369,7 +366,7 @@ describe("storePlan, for a Course created from a Tournament's own article", () =
     expect(await linkOf(t.id)).toMatchObject({ courseId, match: "tournament_article" });
     // Untouched, and no article-sourced twin of it beside it.
     expect(await namedCourses(fromOpenGolfApi.name)).toHaveLength(1);
-    expect(await namedCourses(`The Yokohama Golf Club ${run}`)).toEqual([]);
+    expect(await namedCourses(`The Doral Golf Club ${run}`)).toEqual([]);
   });
 
   it("points at a Course this same run is about to fetch, once it has an id", async () => {
