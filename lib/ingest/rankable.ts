@@ -13,6 +13,13 @@ export type NextTournament = {
   name: string;
   /** The Course name as the schedule's own Source recorded it, whether or not it matched. */
   courseName: string | null;
+  /**
+   * The matched `courses` row id, resolved the same way lib/page/data.ts's `matchCourse`
+   * resolves it for rendering: `tournaments.courseId` where stored, otherwise the row whose
+   * name matches `courseName` exactly, ignoring case and spacing. The caller must resolve it
+   * that way rather than passing the raw stored column, or this can fail a Tournament the
+   * page would actually render fine.
+   */
   courseId: number | null;
 };
 

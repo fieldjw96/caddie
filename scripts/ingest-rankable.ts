@@ -7,8 +7,9 @@
 
 import { count, eq, isNotNull } from "drizzle-orm";
 import { client, db } from "../db/migration-client";
-import { courseTraits, playerStrengths, tournaments } from "../db/schema";
+import { courses, courseTraits, playerStrengths, tournaments } from "../db/schema";
 import { checkRankable, type NextTournament } from "../lib/ingest/rankable";
+import { matchCourse } from "../lib/page/data";
 import { nextTournament } from "../lib/schedule/next-tournament";
 
 async function courseTraitCount(courseId: number): Promise<number> {
@@ -37,8 +38,19 @@ async function main(): Promise<void> {
     })
     .from(tournaments);
   const upcoming = nextTournament(schedule, new Date());
+  const knownCourses = await db.select({ id: courses.id, name: courses.name }).from(courses);
+  const matchedCourse = upcoming
+    ? matchCourse(
+        { courseId: upcoming.courseId, courseName: upcoming.courseName },
+        knownCourses,
+      )
+    : null;
   const next: NextTournament | null = upcoming
-    ? { name: upcoming.name, courseName: upcoming.courseName, courseId: upcoming.courseId }
+    ? {
+        name: upcoming.name,
+        courseName: upcoming.courseName,
+        courseId: matchedCourse?.id ?? null,
+      }
     : null;
 
   const result = checkRankable({
