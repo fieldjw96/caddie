@@ -20,7 +20,7 @@ export const LICENCES = {
     licence: "CC BY-SA 4.0",
     licenceUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
     covers:
-      "the schedule, each Tournament's venue, every result, and a matched Course's altitude and green surface where its own article states them",
+      "the schedule, each Tournament's venue, every result, a matched Course's altitude and green surface where its own article states them, and the par and yardage of a Course OpenGolfAPI does not have",
   },
   opengolfapi: {
     name: "OpenGolfAPI",

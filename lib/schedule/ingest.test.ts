@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildTournamentRecords, resolveCourseNames } from "./ingest";
+import {
+  buildTournamentRecords,
+  resolveCourseFacts,
+  type TournamentArticleCourse,
+} from "./ingest";
 import type { ScheduleRow } from "./parse";
 
 const ROWS: ScheduleRow[] = [
@@ -29,36 +33,81 @@ const ROWS: ScheduleRow[] = [
   },
 ];
 
+const WAIALAE: TournamentArticleCourse = {
+  name: "Waialae Country Club",
+  par: 70,
+  yardage: 7044,
+  articleUrl: "https://en.wikipedia.org/w/index.php?title=Sony_Open_in_Hawaii&oldid=7",
+};
+
 describe("buildTournamentRecords", () => {
   it("drops canceled rows and never invents a courses row", () => {
     const records = buildTournamentRecords(
       ROWS,
       2026,
       "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
-      new Map([
-        ["Sony Open in Hawaii", "Waialae Country Club"],
-        ["The American Express", null],
-      ]),
+      new Map([["Sony Open in Hawaii", WAIALAE]]),
     );
 
     expect(records).toHaveLength(2);
     expect(records.every((r) => !("courseId" in r))).toBe(true);
   });
 
-  it("carries the resolved Course name as written, or null when unresolved", () => {
+  it("carries the Course name, par and yardage as the article states them", () => {
     const records = buildTournamentRecords(
       ROWS,
       2026,
       "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
-      new Map([["Sony Open in Hawaii", "Waialae Country Club"]]),
+      new Map([["Sony Open in Hawaii", WAIALAE]]),
     );
 
     expect(records[0]).toMatchObject({
       name: "Sony Open in Hawaii",
       courseName: "Waialae Country Club",
+      coursePar: 70,
+      courseYardage: 7044,
+      courseArticleUrl: WAIALAE.articleUrl,
       source: "wikipedia",
     });
-    expect(records[1]).toMatchObject({ name: "The American Express", courseName: null });
+  });
+
+  it("leaves every Course fact null for an article that could not be read", () => {
+    const records = buildTournamentRecords(
+      ROWS,
+      2026,
+      "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
+      new Map([["Sony Open in Hawaii", WAIALAE]]),
+    );
+
+    expect(records[1]).toMatchObject({
+      name: "The American Express",
+      courseName: null,
+      coursePar: null,
+      courseYardage: null,
+      courseArticleUrl: null,
+    });
+  });
+
+  it("keeps a fact the article does not state, without losing the revision it was read at", () => {
+    const silent: TournamentArticleCourse = {
+      name: "TPC Somewhere",
+      par: null,
+      yardage: null,
+      articleUrl: "https://en.wikipedia.org/w/index.php?title=X&oldid=9",
+    };
+    const records = buildTournamentRecords(
+      ROWS,
+      2026,
+      "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
+      new Map([["Sony Open in Hawaii", silent]]),
+    );
+
+    expect(records[0]).toMatchObject({
+      courseName: "TPC Somewhere",
+      coursePar: null,
+      courseYardage: null,
+      courseArticleUrl: silent.articleUrl,
+    });
   });
 
   it("stamps every record with the season and the given source URL", () => {
@@ -72,27 +121,56 @@ describe("buildTournamentRecords", () => {
   });
 });
 
-vi.mock("./wikipedia", () => ({
+vi.mock("./wikipedia", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./wikipedia")>()),
   fetchArticle: vi.fn(),
 }));
 
-describe("resolveCourseNames", () => {
-  it("resolves a Course name per article and never blocks on one failing", async () => {
+describe("resolveCourseFacts", () => {
+  it("reads every Course fact from the one article it already fetches", async () => {
     const { fetchArticle } = await import("./wikipedia");
     vi.mocked(fetchArticle).mockImplementation((title: string) => {
       if (title === "Sony Open in Hawaii") {
         return Promise.resolve({
           title,
-          revid: 1,
-          wikitext: "{{Infobox golf tournament\n| course = [[Waialae Country Club]]\n}}",
+          revid: 7,
+          wikitext:
+            "{{Infobox golf tournament\n| course = [[Waialae Country Club]]\n" +
+            "| par = 70\n| yardage = {{convert|7,044|yd|m}}\n}}",
         });
       }
       return Promise.reject(new Error("network trouble"));
     });
 
-    const names = await resolveCourseNames(["Sony Open in Hawaii", "The American Express"]);
+    const facts = await resolveCourseFacts(["Sony Open in Hawaii", "The American Express"]);
 
-    expect(names.get("Sony Open in Hawaii")).toBe("Waialae Country Club");
-    expect(names.get("The American Express")).toBeNull();
+    expect(facts.get("Sony Open in Hawaii")).toEqual({
+      name: "Waialae Country Club",
+      par: 70,
+      yardage: 7044,
+      articleUrl: "https://en.wikipedia.org/w/index.php?title=Sony_Open_in_Hawaii&oldid=7",
+    });
+  });
+
+  it("leaves out an article that could not be read, and never blocks on one failing", async () => {
+    const { fetchArticle } = await import("./wikipedia");
+    vi.mocked(fetchArticle).mockImplementation((title: string) =>
+      title === "Sony Open in Hawaii"
+        ? Promise.resolve({
+            title,
+            revid: 7,
+            wikitext: "{{Infobox golf tournament\n| course = [[Waialae Country Club]]\n}}",
+          })
+        : Promise.reject(new Error("network trouble")),
+    );
+
+    const facts = await resolveCourseFacts(["Sony Open in Hawaii", "The American Express"]);
+
+    expect(facts.has("The American Express")).toBe(false);
+    expect(facts.get("Sony Open in Hawaii")).toMatchObject({
+      name: "Waialae Country Club",
+      par: null,
+      yardage: null,
+    });
   });
 });

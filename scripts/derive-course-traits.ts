@@ -12,9 +12,12 @@ import { courses } from "../db/schema";
 import { deriveCourseTraits } from "../lib/course-traits";
 import { storeCourseTraits } from "../lib/course-traits-store";
 
-function trustNote(holesTrusted: boolean | null): string {
-  if (holesTrusted === true) return "trusted holes";
-  if (holesTrusted === false) return "holes not trusted, course-level Traits only";
+function trustNote(course: { holesTrusted: boolean | null; holes: unknown }): string {
+  if (course.holesTrusted === true) return "trusted holes";
+  if (course.holesTrusted === false) return "holes not trusted, course-level Traits only";
+  // A Course created from a Tournament's own Wikipedia article has no holes at all: that
+  // article states a total, never a card. See lib/courses/from-tournament.ts.
+  if (course.holes === null) return "no hole data, course-level Traits only";
   return "holes not checked, course-level Traits only";
 }
 
@@ -27,9 +30,7 @@ async function main(): Promise<void> {
       const traits = deriveCourseTraits(course);
       await storeCourseTraits(db, course.id, traits);
       traitCount += traits.length;
-      console.log(
-        `ok    ${course.name}: ${traits.length} Traits (${trustNote(course.holesTrusted)})`,
-      );
+      console.log(`ok    ${course.name}: ${traits.length} Traits (${trustNote(course)})`);
     }
 
     console.log(`${rows.length} courses, ${traitCount} Traits derived.`);

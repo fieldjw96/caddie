@@ -5,6 +5,7 @@ import type { CourseView, PlayerView, StoredTraits } from "./data";
 
 export const TRUSTED_COURSE: CourseView = {
   name: "Bay Hill Club and Lodge",
+  source: "opengolfapi",
   architect: "Dick Wilson",
   sourceUrl: "https://api.opengolfapi.org/v1/courses/1",
   attribution: "Course data from OpenGolfAPI, ODbL 1.0",
@@ -46,6 +47,36 @@ export const UNTRUSTED_TRAITS: StoredTraits = {
   length_yards: { value: 7555, unit: "yards" },
   par: { value: 72, unit: "strokes" },
   slope_rating_gap: { value: 60.8, unit: "points" },
+};
+
+/**
+ * Yokohama Country Club, as a Course created from the Baycurrent Classic's own Wikipedia
+ * article because OpenGolfAPI's only hit for it is a driving range: a name, a par and a
+ * published total, and nothing else. No tees, so no Slope or Rating; no holes, so no card and
+ * no hole check to report the working of.
+ */
+export const ARTICLE_COURSE: CourseView = {
+  name: "Yokohama Country Club",
+  source: "wikipedia",
+  architect: null,
+  sourceUrl: "https://en.wikipedia.org/w/index.php?title=Baycurrent_Classic&oldid=1378612509",
+  attribution:
+    "Course facts from the English Wikipedia article on the Baycurrent Classic, CC BY-SA 4.0",
+  holesTrusted: null,
+  holesCheckedTee: null,
+  holesYardageSum: null,
+  holesYardageDifference: null,
+  publishedYardage: 7315,
+  championshipTee: null,
+  altitude: null,
+  greenSurface: null,
+  courseFactsSourceUrl: null,
+};
+
+/** The two Traits such a Course supports, both course-level, both enough for a Fit Score. */
+export const ARTICLE_TRAITS: StoredTraits = {
+  length_yards: { value: 7315, unit: "yards" },
+  par: { value: 71, unit: "strokes" },
 };
 
 const strength = (value: number | null, sampleSize: number) => ({ value, sampleSize });

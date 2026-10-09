@@ -4,6 +4,8 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { PageData } from "../lib/page/data";
 import {
+  ARTICLE_COURSE,
+  ARTICLE_TRAITS,
   PLAYERS,
   TRUSTED_COURSE,
   TRUSTED_TRAITS,
@@ -32,6 +34,21 @@ const DATA: PageData = {
 };
 
 const UNTRUSTED: PageData = { ...DATA, course: UNTRUSTED_COURSE, traits: UNTRUSTED_TRAITS };
+
+/** The next Tournament, its Course read off its own article because OpenGolfAPI has none. */
+const FROM_ARTICLE: PageData = {
+  ...DATA,
+  tournament: {
+    name: "Baycurrent Classic",
+    season: 2026,
+    startDate: "2026-10-11",
+    endDate: "2026-10-14",
+    courseName: "Yokohama Country Club",
+    sourceUrl: "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
+  },
+  course: ARTICLE_COURSE,
+  traits: ARTICLE_TRAITS,
+};
 
 const html = (data: PageData | null) => renderToString(<PageView data={data} />);
 
@@ -103,8 +120,26 @@ describe("PageView, rendered on the server", () => {
     }
   });
 
+  // The Ticket this fixture exists for: with no Course there are no Traits, with no Traits no
+  // Fit Score, and the ranking renders nothing at all. Two course-level Traits are enough.
+  it("ranks the field on a Course created from the Tournament's own article", () => {
+    const h = html(FROM_ARTICLE);
+    expect(h).toMatch(/<tr\b[^>]*\bdata-player="Casey Clark"/);
+    expect([...h.matchAll(/<tr\b[^>]*\bdata-player="/g)]).toHaveLength(3);
+
+    const t = text(FROM_ARTICLE);
+    expect(t).toContain("7,315 yards");
+    expect(t).toContain("Yokohama Country Club");
+    // The gap is named honestly: OpenGolfAPI has no record of this Course to have given one.
+    expect(t).toContain("states a published total rather than a hole-by-hole card");
+    expect(t).not.toContain("OpenGolfAPI gave no hole-by-hole data");
+    expect(t).toContain("Course facts from the English Wikipedia article");
+    // The revision itself, linked: CC BY-SA wants the Source named and reachable.
+    expect(h).toContain("oldid=1378612509");
+  });
+
   it("states no prediction, probability or betting position anywhere", () => {
-    for (const data of [DATA, UNTRUSTED, null]) {
+    for (const data of [DATA, UNTRUSTED, FROM_ARTICLE, null]) {
       expect(text(data)).not.toMatch(
         /\bodds\b|\bbet(s|ting)?\b|will win|expected finish|predict|probabilit|favourite|\btips?\b/i,
       );

@@ -1,7 +1,9 @@
 // `npm run ingest:course-facts` reads altitude and green surface off every stored Course's own
 // Wikipedia article and writes whichever of the two its infobox carries. Needs `ingest:courses`
-// first: this enriches the Courses OpenGolfAPI has already matched, rather than fetching a
-// Wikipedia article for a Course that is not on the schedule at all.
+// first: this enriches the Courses that stage has already stored, rather than fetching a
+// Wikipedia article for a Course that is not on the schedule at all. A Course created from a
+// Tournament's own article, because OpenGolfAPI does not have it, is read here like any other:
+// most such Courses have no article of their own, which is reported and is not an error.
 //
 // The article looked up is the Wikipedia-native facility name lib/courses/wikipedia-name.ts
 // derives from the schedule's own Course name (joined in from `tournaments`, which is where
