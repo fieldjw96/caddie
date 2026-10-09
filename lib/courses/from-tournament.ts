@@ -1,5 +1,5 @@
-// The Course of last resort: one created from the Tournament's own Wikipedia article, for the
-// next Tournament only, when OpenGolfAPI does not have the course at all.
+// The Course of last resort: one created from the Tournament's own Wikipedia article, for every
+// Tournament OpenGolfAPI does not have the course for.
 //
 // This is a fallback, not an alternative. OpenGolfAPI is the preferred Source for a Course and
 // nothing here runs until a search there has failed: it holds a card, tees, Slope and Rating
@@ -14,6 +14,17 @@
 // facts come from the one fetch `ingest:schedule` already makes of that article, stored on
 // `tournaments` (see db/schema.ts), so this costs no request of its own.
 //
+// Every Tournament, not just the next one, because a venue record is a Player's results at
+// *this* Course and only joins where a past Tournament points at the same `courses` row. A
+// Tournament linked to nothing takes its whole leaderboard out of reach of that column.
+//
+// Which makes one thing load-bearing: two Tournaments at one venue must reach one row. So a
+// venue is resolved against what is already stored — and against what this run's OpenGolfAPI
+// matches are about to store — by lib/courses/match.ts's own normalisation, the same reading
+// that decides an OpenGolfAPI match. A second row for a venue already held would split the
+// history and leave the column confidently wrong about how often somebody has played there,
+// which is worse than leaving it empty.
+//
 // What it must never do is fill a gap in. `holes`, `holesTrusted` and everything derived from
 // them stay absent: an article states a total, never a card, and a hole-by-hole yardage
 // invented from a total is exactly the confidently-wrong data `holes_trusted` exists to catch.
@@ -24,8 +35,7 @@
 // transaction as the matches, so a run leaves one consistent set of links or none.
 
 import type { CourseRow } from "../opengolfapi/ingest";
-import { nextTournament } from "../schedule/next-tournament";
-import { implausibleRecord, scheduledCourses } from "./match";
+import { distinctiveWords, implausibleRecord, normaliseName, scheduledCourses } from "./match";
 
 /** The stored `tournaments` columns this reads: the Course facts, and where they were read. */
 export interface TournamentCourseRow {
@@ -134,20 +144,153 @@ export function planTournamentArticleCourse(
 }
 
 /**
- * The fallback for the next Tournament, or null when there is nothing to fall back from.
+ * A `courses` row a Tournament's article venue can be pointed at instead of a new one: one
+ * already stored, or one this run's OpenGolfAPI matches are about to store.
  *
- * Null means OpenGolfAPI is doing its job: the next Tournament matched a course there, so that
- * course is used and this path is not taken at all. Null also covers a season with no
- * Tournament still to play. Only the next Tournament is considered — it is the only one the
- * page renders, so it is the only one whose missing Course blanks the page — and which one
- * that is comes from the same `nextTournament` the page itself uses, never a second rule.
+ * `courseId` is null for the second kind, which has no id until it is written;
+ * `openGolfApiId` is how lib/opengolfapi/store.ts finds it once it has.
  */
-export function planNextTournamentCourse<T extends TournamentCourseRow>(
-  tournaments: readonly T[],
+export interface KnownCourse {
+  /** `courses.id`, or null for a row this run has not written yet. */
+  courseId: number | null;
+  /** Its OpenGolfAPI id, when it came from there. Null for an article-sourced Course. */
+  openGolfApiId: string | null;
+  name: string;
+}
+
+/**
+ * One Tournament pointed at a venue, named so a report can say which. The start date is in it
+ * because the same Tournament is in every season: without a year, a report of two editions at
+ * one venue reads as the same name printed twice.
+ */
+export interface TournamentRef {
+  id: number;
+  name: string;
+  startDate: string;
+}
+
+/**
+ * One venue, the `courses` row it is, and every Tournament played on it. Either a Course to
+ * store, this run being the first to know of it, or one already accounted for to point at —
+ * never both, and never neither, which is why this is a union rather than two nullable fields.
+ */
+export type ArticleVenue = {
+  /** The venue as the article of the first of these Tournaments names it. */
+  name: string;
+  tournaments: TournamentRef[];
+} & ({ reuse: null; row: CourseRow } | { reuse: KnownCourse; row: null });
+
+/** A Tournament whose article supports no Course, and the reason, in words a person can check. */
+export interface TournamentCourseSkip {
+  tournamentId: number;
+  tournamentName: string;
+  reason: string;
+}
+
+export interface ArticleCoursePlan {
+  venues: ArticleVenue[];
+  skipped: TournamentCourseSkip[];
+}
+
+/**
+ * What makes two names one venue: lib/courses/match.ts's own reading, the words that identify
+ * a course once case, accents, punctuation and words like "Golf Club" are set aside. This is
+ * the `normalised` tier of an OpenGolfAPI match, called rather than restated, so "The Riviera
+ * Country Club" and "Riviera Country Club" cannot end up as two rows.
+ *
+ * It is that rule and no more: an abbreviation is a distinctive word, so "Riviera CC" reads as
+ * a venue of its own and would be stored as one. Widening the rule here would be a second
+ * implementation of it, and the two would drift; widening `GENERIC_WORDS` in match.ts widens
+ * what an OpenGolfAPI match will accept too, which is a judgement of its own.
+ *
+ * A name of nothing but generic words — "The Golf Club" — has no distinctive words at all, and
+ * falls back to the whole normalised name rather than keying every such venue alike.
+ */
+export function venueKey(name: string): string {
+  const distinctive = distinctiveWords(name).join(" ");
+  return distinctive === "" ? normaliseName(name) : distinctive;
+}
+
+/** The Tournament whose article states a venue's facts: the most recent to be played there. */
+function mostRecentFirst(a: TournamentCourseRow, b: TournamentCourseRow): number {
+  return b.startDate.localeCompare(a.startDate) || a.name.localeCompare(b.name);
+}
+
+const described = (c: KnownCourse) =>
+  `"${c.name}"${c.openGolfApiId === null ? "" : ` (OpenGolfAPI ${c.openGolfApiId})`}`;
+
+/**
+ * Every Tournament OpenGolfAPI could not match, resolved to the Course its own article names.
+ *
+ * `matchedTournamentIds` keeps OpenGolfAPI preferred: a Tournament matched there is not
+ * considered here at all, so nothing can overwrite a match to a record with a card in it.
+ *
+ * `known` is every Course this run can point at — the `courses` table as it stands, plus the
+ * rows the OpenGolfAPI matches are about to write. A venue that reads as exactly one of them
+ * is pointed at it rather than stored again, whichever Source that row came from. A venue that
+ * reads as two of them is skipped and reported: those two rows may well be one venue, but
+ * merging them is a migration with a judgement in it and a Ticket of its own, and guessing
+ * which of the two the Tournament was played on would be the confidently-wrong link this
+ * whole path exists to avoid.
+ *
+ * Tournaments are resolved most recent first, so where several articles name one venue it is
+ * the newest reading of its par and yardage that becomes the row, and the rest point at it.
+ */
+export function planArticleCourses(
+  tournaments: readonly TournamentCourseRow[],
   matchedTournamentIds: ReadonlySet<number>,
-  now: Date,
-): TournamentCourseOutcome | null {
-  const next = nextTournament(tournaments, now);
-  if (next === null || matchedTournamentIds.has(next.id)) return null;
-  return planTournamentArticleCourse(next);
+  known: readonly KnownCourse[],
+): ArticleCoursePlan {
+  const knownByVenue = new Map<string, KnownCourse[]>();
+  for (const course of known) {
+    const key = venueKey(course.name);
+    knownByVenue.set(key, [...(knownByVenue.get(key) ?? []), course]);
+  }
+
+  const venues = new Map<string, ArticleVenue>();
+  const skipped: TournamentCourseSkip[] = [];
+
+  for (const tournament of [...tournaments].sort(mostRecentFirst)) {
+    if (matchedTournamentIds.has(tournament.id)) continue;
+    const outcome = planTournamentArticleCourse(tournament);
+    if (outcome.status === "skipped") {
+      skipped.push({
+        tournamentId: outcome.tournamentId,
+        tournamentName: outcome.tournamentName,
+        reason: outcome.reason,
+      });
+      continue;
+    }
+    const ref = {
+      id: tournament.id,
+      name: tournament.name,
+      startDate: tournament.startDate,
+    };
+    const key = venueKey(outcome.row.name);
+    const already = venues.get(key);
+    if (already) {
+      already.tournaments.push(ref);
+      continue;
+    }
+    const stored = knownByVenue.get(key) ?? [];
+    if (stored.length > 1) {
+      skipped.push({
+        tournamentId: tournament.id,
+        tournamentName: tournament.name,
+        reason:
+          `its article names "${outcome.row.name}", which reads as ${stored.length} stored ` +
+          `Courses (${stored.map(described).join("; ")}), and which of them it is played on ` +
+          "cannot be told from here",
+      });
+      continue;
+    }
+    const [only] = stored;
+    venues.set(key, {
+      name: outcome.row.name,
+      tournaments: [ref],
+      ...(only ? { reuse: only, row: null } : { reuse: null, row: outcome.row }),
+    });
+  }
+
+  return { venues: [...venues.values()], skipped };
 }

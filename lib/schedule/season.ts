@@ -4,6 +4,8 @@
 // once a season's regular season has ended, the next year's article is current even before
 // that article's own schedule fully settles.
 
+import { defaultSeasons } from "../results/season";
+
 const REGULAR_SEASON_FIELD =
   /regular_season\s*=\s*\{\{[Ss]tart date\|(\d+)\|(\d+)\|(\d+)[^}]*\}\}\s*[–—-]\s*\{\{[Ee]nd date\|(\d+)\|(\d+)\|(\d+)[^}]*\}\}/;
 
@@ -38,4 +40,20 @@ export function currentSeasonYear(
   now: Date,
 ): number {
   return now > regularSeasonEnd ? candidateYear + 1 : candidateYear;
+}
+
+/**
+ * Every season `ingest:schedule` reads, oldest first: the current one, and the ones
+ * `ingest:results` reads.
+ *
+ * A past season is read for the same reason the current one is — its Tournaments' own articles
+ * state which Course each was played on, and a Course nothing points at has no venue record in
+ * it. `ingest:results` creates those Tournaments too, from the same schedule tables, but only
+ * their names and dates; the venue facts are an article apart and are this stage's to store.
+ * Reading them here rather than there is what keeps the ingest's order honest: the schedule is
+ * stored before `ingest:courses` matches it, so a season arrives linked in the same run rather
+ * than the next one.
+ */
+export function seasonsToIngest(currentSeason: number, today: string): number[] {
+  return [...new Set([...defaultSeasons(today), currentSeason])].sort((a, b) => a - b);
 }

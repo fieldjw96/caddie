@@ -28,19 +28,23 @@ and enforced in CI, not just written down.
     npm run dev
 
 The schedule, from Wikipedia into `tournaments`: each Tournament's dates, its Course as its
-own article names it, and its Location. About a request a second:
+own article names it, and its Location. Every season the results ingest reads, not only the
+current one, because a past Tournament linked to no Course has no venue record in it. About a
+request a second:
 
     npm run db:migrate
     npm run ingest:schedule
 
-Course facts, from OpenGolfAPI into `courses`, for every Tournament of the current season that
-names a Course, and each Tournament's `course_id` set to it. A match is by name within the
-Tournament's state, and only when certain: exact, normalised (case, punctuation, accents and
-words like "Golf Club" ignored), or declared by a person in `lib/courses/match.ts`. Anything
-less is left null and listed at the end of the run with the name as the schedule wrote it.
-Nothing is written until every request has been made, and a run that would need more than
-OpenGolfAPI has left today stops, writes nothing and exits non-zero. Idempotent, and about 80
-of the 500 requests a day:
+Course facts, from OpenGolfAPI into `courses`, for every stored Tournament that names a Course,
+and each Tournament's `course_id` set to it. A match is by name within the Tournament's state,
+and only when certain: exact, normalised (case, punctuation, accents and words like "Golf Club"
+ignored), or declared by a person in `lib/courses/match.ts`. A Course OpenGolfAPI does not hold
+under that name is created from the Tournament's own article instead, from the par and yardage
+`ingest:schedule` already stored, and a venue that reads as a `courses` row already stored is
+pointed at that row rather than stored twice. Anything less is left null and listed at the end
+of the run with the name as the schedule wrote it. Nothing is written until every request has
+been made, and a run that would need more than OpenGolfAPI has left today stops, writes nothing
+and exits non-zero. Idempotent, and about 100 of the 500 requests a day:
 
     npm run ingest:courses
 
