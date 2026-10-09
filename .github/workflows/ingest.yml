@@ -19,6 +19,13 @@
 # reaches the scripts as DATABASE_URL, the name db/client.ts and drizzle.config.ts read. It is
 # never echoed: every line a stage prints is redacted by scripts/ingest-stage.ts before it is
 # shown or kept, and the last step fails the run if any kept log still shows a credential.
+#
+# The last stage, rankable, is the verdict: it fails the run, after every stage above it has
+# had its chance to finish, if the next Tournament still cannot be ranked. See
+# lib/ingest/rankable.ts for the three ways that can be true. A failure there opens an issue
+# titled below, or comments on the one already open, rather than a new one per day; the next
+# passing run comments and closes it. #51 is why this exists: eight green runs in a row said,
+# in plain words, that the site could not be ranked, and stayed green anyway.
 
 name: Ingest
 
@@ -33,6 +40,9 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  ISSUE_TITLE: "The next Tournament cannot be ranked"
 
 jobs:
   # Migrations before any stage. Usually there is nothing left to apply, because deploy.yml
@@ -55,6 +65,9 @@ jobs:
     needs: migrate
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: write
     env:
       DATABASE_URL: ${{ secrets.CADDIE_DATABASE_URL }}
     steps:
@@ -110,9 +123,52 @@ jobs:
         run: npx tsx scripts/ingest-stage.ts strengths
       - name: "Stage: report"
         run: npx tsx scripts/ingest-stage.ts report
+      - name: "Stage: rankable"
+        id: rankable
+        run: npx tsx scripts/ingest-stage.ts rankable
+
+      # Only the rankable stage above can fail here: every earlier stage already stopped the
+      # run itself if it failed. Opens the one issue this failure gets, or comments on it if
+      # it is already open, with what rankable printed, from its own already-redacted log.
+      - name: Open or update the issue for an unrankable next Tournament
+        if: failure() && steps.rankable.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="$RUNNER_TEMP/rankable-issue.md"
+          log="$INGEST_LOG_DIR/rankable.log"
+          {
+            if [ -s "$log" ]; then cat "$log"; else echo "The rankable stage failed before it could report why."; fi
+            echo ""
+            echo "Run: $RUN_URL"
+          } > "$body"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$ISSUE_TITLE\"" \
+            --json number,title --jq "map(select(.title == env.ISSUE_TITLE)) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+            echo "::error title=Next Tournament cannot be ranked::Still failing. Updated issue #$number."
+          else
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" --body-file "$body")
+            echo "::error title=Next Tournament cannot be ranked::Opened $url"
+          fi
 
       # Whether the stages passed or not: a failed stage is the likeliest to have printed a
       # driver error with a URL in it.
       - name: Check no log shows a credential
         if: always()
         run: npx tsx scripts/ingest-check-logs.ts
+
+      # Only once everything above, rankable included, has passed: the issue above is closed
+      # rather than left open once the site it describes is fixed.
+      - name: Close the issue now the next Tournament can be ranked
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$ISSUE_TITLE\"" \
+            --json number,title --jq "map(select(.title == env.ISSUE_TITLE)) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "Passing again: $RUN_URL"
+          fi

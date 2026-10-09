@@ -65,4 +65,17 @@ describe("the ingest workflow", () => {
   it("checks every log for a credential, whether or not the stages passed", () => {
     expect(code).toMatch(/if: always\(\)\s+run: npx tsx scripts\/ingest-check-logs\.ts/);
   });
+
+  it("opens or updates an issue when the next Tournament cannot be ranked, and needs no secret to", () => {
+    expect(code).toMatch(/if: failure\(\) && steps\.rankable\.outcome == 'failure'/);
+    expect(code).toContain("gh issue create");
+    expect(code).toContain("gh issue comment");
+    expect(code).toMatch(/^\s*issues: write$/m);
+    const secrets = new Set([...code.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((m) => m[1]));
+    expect([...secrets]).toEqual(["CADDIE_DATABASE_URL"]);
+  });
+
+  it("closes that issue once a run passes again", () => {
+    expect(code).toMatch(/if: success\(\)[\s\S]*?gh issue close/);
+  });
 });

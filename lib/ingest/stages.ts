@@ -7,7 +7,10 @@
 // - courses before course facts and course traits, which add to and derive from its rows;
 // - results before strengths, which are derived from them, and last because they also read
 //   the next Tournament's Course;
-// - and a report last, which counts what they stored.
+// - a report after that, which counts what they stored;
+// - and a rankable verdict last of all, which fails the run if the next Tournament the report
+//   just counted still cannot be ranked. It runs after every stage above has had its chance
+//   to finish, never before: see lib/ingest/rankable.ts for the three ways that can be true.
 //
 // .github/workflows/ingest.yml runs exactly these, one step each, in this order, and
 // lib/ingest/workflow.test.ts fails if the two drift apart.
@@ -30,4 +33,6 @@ export const STAGES: readonly Stage[] = [
   { name: "strengths", script: "derive:strengths" },
   // Not an ingest: counts what the ones above left, and fails on an empty table.
   { name: "report", script: "ingest:report" },
+  // The verdict: fails if the next Tournament the report just counted cannot be ranked.
+  { name: "rankable", script: "ingest:rankable" },
 ];
