@@ -60,19 +60,25 @@ export function extractCoursePar(articleWikitext: string): number | null {
   return Number(value);
 }
 
-// Wikipedia writes a yardage as a {{convert}}/{{cvt}} template, as a plain number with or
-// without its unit, or with a thousands separator: "{{Convert|7315|yd}}", "{{convert|7,315|yd|m}}",
-// "7,315 yards", "7315". Only yards are read. A course given in metres is left absent rather
-// than converted, because a metric yardage in a golf infobox is more likely a different
-// measurement than the published championship total this repo means by yardage.
+// Wikipedia writes a yardage as a {{convert}}/{{cvt}} template, as a number with its unit, or
+// as a bare number, with or without a thousands separator: "{{Convert|7315|yd}}",
+// "{{convert|7,315|yd|m}}", "7,315 yards (6,689 m)", "7315". Only yards are read. A total
+// given in metres is left absent rather than converted, because a metric figure in a golf
+// infobox is more likely a different measurement than the published championship total this
+// repo means by yardage.
 const YARDAGE_CONVERT = /^\{\{\s*(?:convert|cvt)\s*\|\s*([\d,]+)\s*\|\s*yd\b/i;
-const YARDAGE_PLAIN = /^([\d,]+)(?:\s*(?:yd|yds|yards?))?$/i;
+const YARDAGE_IN_YARDS = /^([\d,]+)\s*(?:yd|yds|yards?)\b/i;
+// A bare number is read as yards, which is the unit the field is for, and only when it stands
+// alone: anything after it is something this has not been taught to read.
+const YARDAGE_BARE = /^([\d,]+)$/;
 
 /** The `yardage` field in yards, or null when the article states none this can read. */
 export function extractCourseYardage(articleWikitext: string): number | null {
   const value = field(articleWikitext, YARDAGE_FIELD);
   if (value === null) return null;
-  const digits = (YARDAGE_CONVERT.exec(value) ?? YARDAGE_PLAIN.exec(value))?.[1];
+  const digits = (YARDAGE_CONVERT.exec(value) ??
+    YARDAGE_IN_YARDS.exec(value) ??
+    YARDAGE_BARE.exec(value))?.[1];
   if (digits === undefined) return null;
   const yards = Number(digits.replace(/,/g, ""));
   return Number.isInteger(yards) ? yards : null;

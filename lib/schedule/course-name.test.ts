@@ -137,3 +137,15 @@ describe("extractTournamentCourse", () => {
     });
   });
 });
+
+describe("extractCourseYardage, on the shapes real articles use", () => {
+  it("reads a yardage followed by its metric equivalent", () => {
+    expect(extractCourseYardage(`{{Infobox\n| yardage = 7,315 yards (6,689 m)\n}}`)).toBe(
+      7315,
+    );
+  });
+
+  it("refuses a bare number with anything after it", () => {
+    expect(extractCourseYardage(`{{Infobox\n| yardage = 7,315 (from 2025)\n}}`)).toBeNull();
+  });
+});
