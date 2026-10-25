@@ -91,4 +91,30 @@ describe("Ranking", () => {
     expect(order()).not.toContain("Drew Dunn");
     expect(within(noRecordSection()).getByText(/Drew Dunn/)).toBeTruthy();
   });
+
+  it("says nothing separates the Players when the Course's only known Trait is below its range", () => {
+    // Port Royal: the only known Trait, length, falls below the bottom of its range.
+    render(<Ranking players={PLAYERS} traits={{ length_yards: 6_800 }} hasVenue={false} />);
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryAllByRole("rowheader")).toHaveLength(0);
+    expect(
+      screen.getByText(
+        /This Course.s known Traits all sit at or below the bottom of their ranges on the current Weightings, so nothing separates the Players: Length is 6,800, at or below the minimum of 6,900\./,
+      ),
+    ).toBeTruthy();
+    for (const player of PLAYERS) {
+      expect(within(noRecordSection()).getByText(new RegExp(player.name))).toBeTruthy();
+    }
+  });
+
+  it("keeps the original message for a Course with no known Fit Trait", () => {
+    render(<Ranking players={PLAYERS} traits={{}} hasVenue={false} />);
+
+    expect(
+      screen.getByText(
+        /No Player has a Fit Score: either no Course Trait is known for this Course, or no Player has enough results for a Strength\./,
+      ),
+    ).toBeTruthy();
+  });
 });

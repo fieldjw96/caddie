@@ -66,7 +66,10 @@
  * produces a null contribution, which adds nothing either way and is shown as unknown. The
  * result carries how much of the Weighting it rests on, so the page can say so. A Player with
  * no known contribution at all gets a null Fit Score, not a zero, and `rankFits` puts them in
- * a group of their own rather than at the bottom.
+ * a group of their own rather than at the bottom. The same holds when every known contribution
+ * is zero because the Course asks nothing of it, as a short Course does of length: nothing
+ * separates the Players there either, so the Fit Score is null, not a zero the whole field
+ * would share.
  *
  * A venue record is not in the score. It is a record at this Course, not a match between a
  * Trait and a kind of game, and it rests on a handful of results where it exists at all. The
@@ -210,7 +213,10 @@ export interface FitComponent {
 }
 
 export interface FitScore {
-  /** The sum of the known contributions, or null when none is known. */
+  /**
+   * The sum of the known contributions, or null when none of them can separate Players: either
+   * none is known, or every known one rests on a Trait the Course asks nothing of.
+   */
   score: number | null;
   /** Every Trait's working, in the order of TRAIT_SCALES. */
   components: FitComponent[];
@@ -218,6 +224,12 @@ export interface FitScore {
   totalWeight: number;
   /** The Weighting resting on known contributions, out of totalWeight. */
   knownWeight: number;
+  /**
+   * The Course's demand on these Weightings: the sum of weight x normalised over the Traits
+   * the Course has. It does not depend on the Player. Zero means no Trait this Course has can
+   * tell one Player from another on these Weightings, whatever either Player's Strengths are.
+   */
+  demand: number;
 }
 
 export const FIT_TRAITS = Object.keys(TRAIT_SCALES) as FitTraitName[];
@@ -252,9 +264,14 @@ export function fitScore(
 ): FitScore {
   checkWeightings(weightings);
 
-  let score: number | null = null;
+  let sum = 0;
   let totalWeight = 0;
   let knownWeight = 0;
+  let demand = 0;
+  // Whether any known contribution rests on a Trait the Course asks something of. A Fit Score
+  // with none is null: every Player would otherwise share the same zero, which is not a
+  // finding, it is the arithmetic of a Course that cannot separate anyone on these Weightings.
+  let separates = false;
 
   const components = FIT_TRAITS.map((trait): FitComponent => {
     const { min, max, calls } = TRAIT_SCALES[trait];
@@ -267,9 +284,11 @@ export function fitScore(
       normalised === null || edge === null ? null : weight * normalised * edge;
 
     totalWeight += weight;
+    if (normalised !== null) demand += weight * normalised;
     if (contribution !== null) {
-      score = (score ?? 0) + contribution;
+      sum += contribution;
       knownWeight += weight;
+      if (weight * normalised! > 0) separates = true;
     }
     return {
       trait,
@@ -284,7 +303,7 @@ export function fitScore(
     };
   });
 
-  return { score, components, totalWeight, knownWeight };
+  return { score: separates ? sum : null, components, totalWeight, knownWeight, demand };
 }
 
 export interface RankedFits<P> {

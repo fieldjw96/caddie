@@ -119,16 +119,32 @@ export function Ranking({
         ),
       })),
     );
-    // A score resting on none of the Weighting is a zero standing in for unknown: with every
-    // Trait a Player has the Strength for weighted at nothing, the sum is 0 but says nothing.
-    // It is shown with the Players who have no Fit Score, never ranked level with the field.
     return {
-      scored: scored.filter((e) => e.fit.knownWeight > 0),
-      unscored: [...unscored, ...scored.filter((e) => e.fit.knownWeight === 0)].sort((a, b) =>
-        a.player.name.localeCompare(b.player.name, "en"),
-      ),
+      scored,
+      unscored: [...unscored].sort((a, b) => a.player.name.localeCompare(b.player.name, "en")),
     };
   }, [players, traits, deferred]);
+
+  // Independent of any Player: zero means no known Trait here can tell one Player from
+  // another on the current Weightings, whatever either Player's Strengths are.
+  const demand = useMemo(() => fitScore(traits, {}, deferred).demand, [traits, deferred]);
+
+  // The known Traits sitting at or below the bottom of their range: on the current
+  // Weightings, those are the ones leaving every Player's Fit Score null together.
+  const blockingTraits = useMemo(
+    () =>
+      FIT_TRAITS.flatMap((trait) => {
+        const value = traits[trait] ?? null;
+        return value !== null && value <= TRAIT_SCALES[trait].min ? [{ trait, value }] : [];
+      }),
+    [traits],
+  );
+  const knownTraitCount = FIT_TRAITS.filter((t) => (traits[t] ?? null) !== null).length;
+  const nothingSeparates =
+    ranked.scored.length === 0 &&
+    knownTraitCount > 0 &&
+    demand === 0 &&
+    blockingTraits.length > 0;
 
   const changed = FIT_TRAITS.some((t) => weightings[t] !== DEFAULT_WEIGHTINGS[t]);
   const totalWeight = FIT_TRAITS.reduce((sum, t) => sum + weightings[t], 0);
@@ -152,8 +168,22 @@ export function Ranking({
 
         {ranked.scored.length === 0 ? (
           <p className="mt-4 rounded border border-rule bg-gap-panel p-3 text-sm">
-            No Player has a Fit Score: either no Course Trait is known for this Course, or no
-            Player has enough results for a Strength.
+            {nothingSeparates ? (
+              <>
+                This Course&rsquo;s known Traits all sit at or below the bottom of their
+                ranges on the current Weightings, so nothing separates the Players:{" "}
+                {blockingTraits
+                  .map(
+                    ({ trait, value }) =>
+                      `${TRAIT_LABELS[trait]} is ${formatRangeEnd(trait, value)}, at or below the minimum of ${formatRangeEnd(trait, TRAIT_SCALES[trait].min)}`,
+                  )
+                  .join("; ")}
+                .
+              </>
+            ) : (
+              "No Player has a Fit Score: either no Course Trait is known for this Course, or " +
+              "no Player has enough results for a Strength."
+            )}
           </p>
         ) : (
           <div className="mt-4 max-h-[36rem] overflow-auto rounded border border-rule">
