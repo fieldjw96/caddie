@@ -170,8 +170,8 @@ export function Ranking({
           <p className="mt-4 rounded border border-rule bg-gap-panel p-3 text-sm">
             {nothingSeparates ? (
               <>
-                This Course&rsquo;s known Traits all sit at or below the bottom of their
-                ranges on the current Weightings, so nothing separates the Players:{" "}
+                This Course&rsquo;s known Traits all sit at or below the bottom of their ranges
+                on the current Weightings, so nothing separates the Players:{" "}
                 {blockingTraits
                   .map(
                     ({ trait, value }) =>

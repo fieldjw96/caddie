@@ -288,7 +288,7 @@ export function fitScore(
     if (contribution !== null) {
       sum += contribution;
       knownWeight += weight;
-      if (weight * normalised! > 0) separates = true;
+      if (normalised !== null && weight * normalised > 0) separates = true;
     }
     return {
       trait,
