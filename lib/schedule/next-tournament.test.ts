@@ -2,20 +2,30 @@ import { describe, expect, it } from "vitest";
 import { nextTournament, type UpcomingTournament } from "./next-tournament";
 
 const schedule: UpcomingTournament[] = [
-  { name: "The American Express", startDate: "2026-01-25" },
-  { name: "Farmers Insurance Open", startDate: "2026-02-01" },
-  { name: "WM Phoenix Open", startDate: "2026-02-08" },
-  { name: "RSM Classic", startDate: "2026-11-22" },
+  { name: "The American Express", startDate: "2026-01-22", endDate: "2026-01-25" },
+  { name: "Farmers Insurance Open", startDate: "2026-01-29", endDate: "2026-02-01" },
+  { name: "WM Phoenix Open", startDate: "2026-02-05", endDate: "2026-02-08" },
+  { name: "RSM Classic", startDate: "2026-11-19", endDate: "2026-11-22" },
 ];
 
 describe("nextTournament", () => {
-  it("returns the soonest Tournament during a normal week", () => {
-    const now = new Date("2026-01-20T12:00:00Z");
+  it("returns the soonest Tournament the day before it starts", () => {
+    const now = new Date("2026-01-21T12:00:00Z");
     expect(nextTournament(schedule, now)?.name).toBe("The American Express");
   });
 
-  it("returns the Tournament that starts today, not the one after it", () => {
-    const now = new Date("2026-02-01T18:00:00Z");
+  it("stays the current Tournament on the day it starts", () => {
+    const now = new Date("2026-01-22T18:00:00Z");
+    expect(nextTournament(schedule, now)?.name).toBe("The American Express");
+  });
+
+  it("stays the current Tournament on its final day", () => {
+    const now = new Date("2026-01-25T23:00:00Z");
+    expect(nextTournament(schedule, now)?.name).toBe("The American Express");
+  });
+
+  it("moves on to the next Tournament the day after the current one's final day", () => {
+    const now = new Date("2026-01-26T00:00:00Z");
     expect(nextTournament(schedule, now)?.name).toBe("Farmers Insurance Open");
   });
 
@@ -26,8 +36,8 @@ describe("nextTournament", () => {
 
   it("breaks a same-day tie deterministically, by name", () => {
     const tied: UpcomingTournament[] = [
-      { name: "WM Phoenix Open", startDate: "2026-02-08" },
-      { name: "Additional Event", startDate: "2026-02-08" },
+      { name: "WM Phoenix Open", startDate: "2026-02-05", endDate: "2026-02-08" },
+      { name: "Additional Event", startDate: "2026-02-05", endDate: "2026-02-08" },
     ];
     expect(nextTournament(tied, new Date("2026-02-01T00:00:00Z"))?.name).toBe(
       "Additional Event",

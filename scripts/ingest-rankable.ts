@@ -33,6 +33,7 @@ async function main(): Promise<void> {
     .select({
       name: tournaments.name,
       startDate: tournaments.startDate,
+      endDate: tournaments.endDate,
       courseName: tournaments.courseName,
       courseId: tournaments.courseId,
     })
