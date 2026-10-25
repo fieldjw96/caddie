@@ -160,15 +160,15 @@ describe("fitScore", () => {
     expect(fit.totalWeight).toBeCloseTo(1, 12);
   });
 
-  it("scores the same Player at zero at a Course that asks nothing of them", () => {
+  it("gives a null score, not a shared zero, at a Course that asks nothing of anyone", () => {
     const fit = fitScore(NOT_SUITING, STRONG);
-    expect(fit.score).toBe(0);
-    // Known, and zero because the Course asks nothing: not the same as unknown.
+    expect(fit.score).toBeNull();
+    // Every contribution is known, and every one is zero because the Course asks nothing:
+    // nothing here can separate this Player from any other, so the score is null, not a zero
+    // the whole field would share.
     expect(fit.components.every((c) => c.contribution === 0)).toBe(true);
     expect(fit.knownWeight).toBeCloseTo(1, 12);
-    expect(fitScore(NOT_SUITING, STRONG).score!).toBeLessThan(
-      fitScore(SUITING, STRONG).score!,
-    );
+    expect(fit.demand).toBe(0);
   });
 
   it("breaks out every Trait's working so the page need not recompute it", () => {
@@ -271,6 +271,42 @@ describe("fitScore", () => {
   });
 });
 
+describe("a Course that asks nothing that separates Players", () => {
+  // Port Royal, whose only known Trait falls below the bottom of its range.
+  const SHORT: FitCourseTraits = { length_yards: 6_800 };
+
+  it("gives a null score even for a Player with every Strength known", () => {
+    const fit = fitScore(SHORT, STRONG);
+    expect(fit.score).toBeNull();
+    expect(fit.demand).toBe(0);
+    const length = fit.components.find((c) => c.trait === "length_yards")!;
+    expect(length.normalised).toBe(0);
+    expect(length.contribution).toBe(0);
+  });
+
+  it("scores as before once a second Trait is inside its range", () => {
+    const withSlope: FitCourseTraits = { ...SHORT, slope_rating_gap: 70 };
+    const fit = fitScore(withSlope, STRONG);
+    expect(fit.score).toBeCloseTo(0.25 * 0.5 * 0.5, 12);
+    expect(fit.demand).toBeCloseTo(0.25 * 0.5, 12);
+    expect(fit.score).not.toBeNull();
+  });
+
+  it("gives a null score when every Weighting is 0, whatever the Course or Player", () => {
+    const allZero: Weightings = {
+      length_yards: 0,
+      slope_rating_gap: 0,
+      mean_par_4_yards: 0,
+      longest_par_4_yards: 0,
+      par_5_share: 0,
+    };
+    const fit = fitScore(SUITING, STRONG, allZero);
+    expect(fit.score).toBeNull();
+    expect(fit.demand).toBe(0);
+    expect(fit.totalWeight).toBe(0);
+  });
+});
+
 describe("rankFits", () => {
   it("ranks the scored highest first and keeps the unscored apart, not at the bottom", () => {
     const players = [
@@ -366,14 +402,11 @@ describe("fitScore, as properties over generated inputs", () => {
       const { traits, weightings, a, b } = generated(random);
       for (const player of [a, b]) {
         const fit = fitScore(traits, player, weightings);
-        if (fit.score === null) {
-          expect(fit.knownWeight, `seed ${seed}`).toBe(0);
-          continue;
-        }
+        expect(fit.knownWeight, `seed ${seed}`).toBeLessThanOrEqual(fit.totalWeight + 1e-12);
+        if (fit.score === null) continue;
         expect(Math.abs(fit.score), `seed ${seed}`).toBeLessThanOrEqual(
           fit.totalWeight + 1e-12,
         );
-        expect(fit.knownWeight, `seed ${seed}`).toBeLessThanOrEqual(fit.totalWeight + 1e-12);
       }
     }
   });

@@ -119,16 +119,32 @@ export function Ranking({
         ),
       })),
     );
-    // A score resting on none of the Weighting is a zero standing in for unknown: with every
-    // Trait a Player has the Strength for weighted at nothing, the sum is 0 but says nothing.
-    // It is shown with the Players who have no Fit Score, never ranked level with the field.
     return {
-      scored: scored.filter((e) => e.fit.knownWeight > 0),
-      unscored: [...unscored, ...scored.filter((e) => e.fit.knownWeight === 0)].sort((a, b) =>
-        a.player.name.localeCompare(b.player.name, "en"),
-      ),
+      scored,
+      unscored: [...unscored].sort((a, b) => a.player.name.localeCompare(b.player.name, "en")),
     };
   }, [players, traits, deferred]);
+
+  // The known Traits sitting at or below the bottom of their range. This is a property of
+  // the Course alone, never the Weightings: a Trait zero-weighted by the slider still asks
+  // something of the Course, it is just not being counted right now, so it does not belong
+  // here and must not be named as a reason nothing separates the Players.
+  const blockingTraits = useMemo(
+    () =>
+      FIT_TRAITS.flatMap((trait) => {
+        const value = traits[trait] ?? null;
+        return value !== null && value <= TRAIT_SCALES[trait].min ? [{ trait, value }] : [];
+      }),
+    [traits],
+  );
+  const knownTraitCount = FIT_TRAITS.filter((t) => (traits[t] ?? null) !== null).length;
+  // True only when every known Trait is below its range, so the sentence naming them as the
+  // reason is actually true. If some other known Trait is merely zero-weighted right now, it
+  // is not why nothing separates the Players, and this stays false.
+  const nothingSeparates =
+    ranked.scored.length === 0 &&
+    knownTraitCount > 0 &&
+    blockingTraits.length === knownTraitCount;
 
   const changed = FIT_TRAITS.some((t) => weightings[t] !== DEFAULT_WEIGHTINGS[t]);
   const totalWeight = FIT_TRAITS.reduce((sum, t) => sum + weightings[t], 0);
@@ -152,8 +168,22 @@ export function Ranking({
 
         {ranked.scored.length === 0 ? (
           <p className="mt-4 rounded border border-rule bg-gap-panel p-3 text-sm">
-            No Player has a Fit Score: either no Course Trait is known for this Course, or no
-            Player has enough results for a Strength.
+            {nothingSeparates ? (
+              <>
+                This Course&rsquo;s known Traits all sit at or below the bottom of their ranges
+                on the current Weightings, so nothing separates the Players:{" "}
+                {blockingTraits
+                  .map(
+                    ({ trait, value }) =>
+                      `${TRAIT_LABELS[trait]} is ${formatRangeEnd(trait, value)}, at or below the minimum of ${formatRangeEnd(trait, TRAIT_SCALES[trait].min)}`,
+                  )
+                  .join("; ")}
+                .
+              </>
+            ) : (
+              "No Player has a Fit Score: either no Course Trait is known for this Course, or " +
+              "no Player has enough results for a Strength."
+            )}
           </p>
         ) : (
           <div className="mt-4 max-h-[36rem] overflow-auto rounded border border-rule">

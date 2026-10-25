@@ -91,4 +91,54 @@ describe("Ranking", () => {
     expect(order()).not.toContain("Drew Dunn");
     expect(within(noRecordSection()).getByText(/Drew Dunn/)).toBeTruthy();
   });
+
+  it("says nothing separates the Players when the Course's only known Trait is below its range", () => {
+    // Port Royal: the only known Trait, length, falls below the bottom of its range.
+    render(<Ranking players={PLAYERS} traits={{ length_yards: 6_800 }} hasVenue={false} />);
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryAllByRole("rowheader")).toHaveLength(0);
+    expect(
+      screen.getByText(
+        /This Course.s known Traits all sit at or below the bottom of their ranges on the current Weightings, so nothing separates the Players: Length is 6,800, at or below the minimum of 6,900\./,
+      ),
+    ).toBeTruthy();
+    for (const player of PLAYERS) {
+      expect(within(noRecordSection()).getByText(new RegExp(player.name))).toBeTruthy();
+    }
+  });
+
+  it("does not blame a known Trait's range when a different known Trait is merely zero-weighted", () => {
+    // Length is known and below its range, which is a real reason nothing separates the
+    // Players. Slope against rating is also known, but sits inside its range: 70 is between
+    // its 60-80. Zeroing its slider, not its value, is why it stops separating anyone, so the
+    // message must not claim it sits at or below the bottom of its range too.
+    render(
+      <Ranking
+        players={PLAYERS}
+        traits={{ length_yards: 6_800, slope_rating_gap: 70 }}
+        hasVenue={false}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Slope against rating"), {
+      target: { value: "0" },
+    });
+
+    expect(screen.queryByText(/sit at or below the bottom of their ranges/)).toBeNull();
+    expect(
+      screen.getByText(
+        /No Player has a Fit Score: either no Course Trait is known for this Course, or no Player has enough results for a Strength\./,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("keeps the original message for a Course with no known Fit Trait", () => {
+    render(<Ranking players={PLAYERS} traits={{}} hasVenue={false} />);
+
+    expect(
+      screen.getByText(
+        /No Player has a Fit Score: either no Course Trait is known for this Course, or no Player has enough results for a Strength\./,
+      ),
+    ).toBeTruthy();
+  });
 });
