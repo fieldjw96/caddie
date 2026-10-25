@@ -50,6 +50,18 @@ export const UNTRUSTED_TRAITS: StoredTraits = {
 };
 
 /**
+ * Augusta's par mix and par 5 share: derived even though its holes are untrusted, because its
+ * pars are right even though its member-tee yardages are not.
+ */
+export const UNTRUSTED_TRAITS_WITH_PAR_MIX: StoredTraits = {
+  ...UNTRUSTED_TRAITS,
+  par_3_count: { value: 4, unit: "holes" },
+  par_4_count: { value: 10, unit: "holes" },
+  par_5_count: { value: 4, unit: "holes" },
+  par_5_share: { value: 4 / 18, unit: "share" },
+};
+
+/**
  * Yokohama Country Club, as a Course created from the Baycurrent Classic's own Wikipedia
  * article because OpenGolfAPI's only hit for it is a driving range: a name, a par and a
  * published total, and nothing else. No tees, so no Slope or Rating; no holes, so no card and

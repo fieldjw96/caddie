@@ -118,11 +118,13 @@ export const HOLE_YARDAGE_TOLERANCE_PERCENT = 3;
 /**
  * One golf course, by its own name. It outlives any Tournament held there.
  *
- * `holes_trusted` is the contract with whatever derives Course Traits. It records whether the
- * hole-by-hole yardages, summed, agree with the published total to within
- * HOLE_YARDAGE_TOLERANCE_PERCENT. OpenGolfAPI returns member-tee holes for Augusta, 1,080 yards short
- * of the card, and a Trait built on those holes would be confidently wrong. A Trait derived
- * from hole yardages must be refused for a course where this is false.
+ * `holes_trusted` is the contract with whatever derives Course Traits, but only for the
+ * yardage-derived ones. It records whether the hole-by-hole yardages, summed, agree with the
+ * published total to within HOLE_YARDAGE_TOLERANCE_PERCENT. OpenGolfAPI returns member-tee
+ * holes for Augusta, 1,080 yards short of the card, and a Trait built on those holes would be
+ * confidently wrong. A Trait derived from hole yardages must be refused for a course where this
+ * is false. The pars in `holes` have a check of their own, independent of this one — see
+ * lib/course-traits.ts — because Augusta's pars are right even though its yardages are not.
  */
 export const courses = pgTable(
   "courses",
