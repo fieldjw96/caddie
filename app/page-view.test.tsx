@@ -149,4 +149,30 @@ describe("PageView, rendered on the server", () => {
   it("says so plainly when no Tournament is upcoming", () => {
     expect(text(null)).toContain("No upcoming PGA Tour Tournament is stored");
   });
+
+  it("hides the Record here column when no Player has a venue record value", () => {
+    const playersNoVenueValue: typeof PLAYERS = PLAYERS.map((p) => ({
+      ...p,
+      venueRecord: { value: null, sampleSize: 0 },
+    }));
+    const data: PageData = { ...DATA, players: playersNoVenueValue };
+    const h = html(data);
+    const t = text(data);
+    expect(t).not.toContain("Record here");
+    expect(h).not.toMatch(/<th[^>]*>\s*Record here\s*<\/th>/);
+  });
+
+  it("shows the Record here column when at least one Player has a venue record value", () => {
+    const playersWithOneVenue: typeof PLAYERS = PLAYERS.map((p) => ({
+      ...p,
+      venueRecord: { value: 0.75, sampleSize: 3 },
+    }));
+    const data: PageData = { ...DATA, players: playersWithOneVenue };
+    const h = html(data);
+    const t = text(data);
+    expect(t).toContain("Record here");
+    expect(h).toMatch(/<th[^>]*>\s*Record here\s*<\/th>/);
+    // Verify that all rows show the column, even though all have the same value
+    expect([...h.matchAll(/<td[^>]*>[\s\S]*?75%[\s\S]*?<\/td>/g)]).toHaveLength(4);
+  });
 });
