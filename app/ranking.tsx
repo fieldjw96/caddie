@@ -125,12 +125,10 @@ export function Ranking({
     };
   }, [players, traits, deferred]);
 
-  // Independent of any Player: zero means no known Trait here can tell one Player from
-  // another on the current Weightings, whatever either Player's Strengths are.
-  const demand = useMemo(() => fitScore(traits, {}, deferred).demand, [traits, deferred]);
-
-  // The known Traits sitting at or below the bottom of their range: on the current
-  // Weightings, those are the ones leaving every Player's Fit Score null together.
+  // The known Traits sitting at or below the bottom of their range. This is a property of
+  // the Course alone, never the Weightings: a Trait zero-weighted by the slider still asks
+  // something of the Course, it is just not being counted right now, so it does not belong
+  // here and must not be named as a reason nothing separates the Players.
   const blockingTraits = useMemo(
     () =>
       FIT_TRAITS.flatMap((trait) => {
@@ -140,11 +138,13 @@ export function Ranking({
     [traits],
   );
   const knownTraitCount = FIT_TRAITS.filter((t) => (traits[t] ?? null) !== null).length;
+  // True only when every known Trait is below its range, so the sentence naming them as the
+  // reason is actually true. If some other known Trait is merely zero-weighted right now, it
+  // is not why nothing separates the Players, and this stays false.
   const nothingSeparates =
     ranked.scored.length === 0 &&
     knownTraitCount > 0 &&
-    demand === 0 &&
-    blockingTraits.length > 0;
+    blockingTraits.length === knownTraitCount;
 
   const changed = FIT_TRAITS.some((t) => weightings[t] !== DEFAULT_WEIGHTINGS[t]);
   const totalWeight = FIT_TRAITS.reduce((sum, t) => sum + weightings[t], 0);

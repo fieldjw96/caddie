@@ -108,6 +108,30 @@ describe("Ranking", () => {
     }
   });
 
+  it("does not blame a known Trait's range when a different known Trait is merely zero-weighted", () => {
+    // Length is known and below its range, which is a real reason nothing separates the
+    // Players. Slope against rating is also known, but sits inside its range: 70 is between
+    // its 60-80. Zeroing its slider, not its value, is why it stops separating anyone, so the
+    // message must not claim it sits at or below the bottom of its range too.
+    render(
+      <Ranking
+        players={PLAYERS}
+        traits={{ length_yards: 6_800, slope_rating_gap: 70 }}
+        hasVenue={false}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Slope against rating"), {
+      target: { value: "0" },
+    });
+
+    expect(screen.queryByText(/sit at or below the bottom of their ranges/)).toBeNull();
+    expect(
+      screen.getByText(
+        /No Player has a Fit Score: either no Course Trait is known for this Course, or no Player has enough results for a Strength\./,
+      ),
+    ).toBeTruthy();
+  });
+
   it("keeps the original message for a Course with no known Fit Trait", () => {
     render(<Ranking players={PLAYERS} traits={{}} hasVenue={false} />);
 
