@@ -34,13 +34,19 @@
 //   level, for a Course whose altitude is not stored.
 //
 // `length_yards`, `par` and `slope_rating_gap` are course-level: OpenGolfAPI's own published
-// total, par and per-tee card, trusted whatever the hole-by-hole data says. The par mix, both
-// par-4 lengths and the par-5 share all read the `holes` array, and `holes_trusted` is the
-// gate on every one of them: OpenGolfAPI returns Augusta's member-tee holes, 1,080 yards short
-// of its card, and nothing here can tell a correct hole from a wrong one by inspection alone.
-// So any Trait built from `holes` is refused outright — absent from the result, not a zero and
-// not the course-level number standing in for it — for a course whose `holes_trusted` is not
-// exactly `true`. See db/schema.ts and lib/opengolfapi/holes.ts for the check itself.
+// total, par and per-tee card, trusted whatever the hole-by-hole data says. Both par-4 lengths
+// read the `holes` array's yardages, and `holes_trusted` is the gate on both of them:
+// OpenGolfAPI returns Augusta's member-tee holes, 1,080 yards short of its card, and nothing
+// here can tell a correct hole's yardage from a wrong one by inspection alone. So a Trait built
+// from hole yardages is refused outright — absent from the result, not a zero and not the
+// course-level number standing in for it — for a course whose `holes_trusted` is not exactly
+// `true`. See db/schema.ts and lib/opengolfapi/holes.ts for the check itself.
+//
+// The par mix (`par_3_count`, `par_4_count`, `par_5_count`) and `par_5_share` read `holes` too,
+// but only its pars, never its yardages, so they rest on a check of their own rather than on
+// `holes_trusted`: it passes when there are exactly 18 holes, every hole carries an integer
+// par, and those pars sum to `courses.par`. Augusta's pars are right even though its yardages
+// are wrong, so these four are derived there whatever `holes_trusted` says.
 
 import type { CourseHole, CourseTee, courses } from "../db/schema";
 
@@ -79,6 +85,13 @@ function courseLevel(fields: string): string {
 
 function trustedHoles(fields: string): string {
   return `Derived from ${fields} (trusted hole data; refused when holes_trusted is not true).`;
+}
+
+function parChecked(fields: string): string {
+  return (
+    `Derived from ${fields} (the par check: exactly 18 holes, each an integer par, summing ` +
+    `to courses.par; refused otherwise).`
+  );
 }
 
 function makeTrait(
@@ -158,34 +171,48 @@ function yardageAt(hole: CourseHole, tee: string): number | null {
   return yardage === undefined ? null : yardage;
 }
 
-/** Traits read off the `holes` array: refused outright unless `holes_trusted` is `true`. */
-function holeDerivedTraits(course: CourseFacts): DerivedCourseTrait[] {
-  if (course.holesTrusted !== true || !course.holes || course.holes.length === 0) return [];
-  const holes = course.holes;
-  const holeCount = holes.length;
+/**
+ * The par check: exactly 18 holes, each an integer par, summing to `courses.par`. Independent
+ * of `holes_trusted`, which is a check on yardages — Augusta's pars are right even though its
+ * member-tee yardages are 1,080 yards short of the card.
+ */
+function parsAreSound(course: CourseFacts): boolean {
+  if (course.par === null || !course.holes || course.holes.length !== 18) return false;
+  let sum = 0;
+  for (const hole of course.holes) {
+    if (hole.par === null || !Number.isInteger(hole.par)) return false;
+    sum += hole.par;
+  }
+  return sum === course.par;
+}
 
-  const traits: DerivedCourseTrait[] = [];
+/** The par mix and par 5 share: gated on the par check, whatever `holes_trusted` says. */
+function parMixTraits(course: CourseFacts): DerivedCourseTrait[] {
+  if (!parsAreSound(course) || !course.holes) return [];
+  const holes = course.holes;
   const byPar = (par: number) => holes.filter((h) => h.par === par);
-  const parFours = byPar(4);
   const parFives = byPar(5);
 
-  traits.push(
-    makeTrait("par_3_count", byPar(3).length, "holes", trustedHoles("courses.holes[].par")),
-  );
-  traits.push(
-    makeTrait("par_4_count", parFours.length, "holes", trustedHoles("courses.holes[].par")),
-  );
-  traits.push(
-    makeTrait("par_5_count", parFives.length, "holes", trustedHoles("courses.holes[].par")),
-  );
-  traits.push(
+  return [
+    makeTrait("par_3_count", byPar(3).length, "holes", parChecked("courses.holes[].par")),
+    makeTrait("par_4_count", byPar(4).length, "holes", parChecked("courses.holes[].par")),
+    makeTrait("par_5_count", parFives.length, "holes", parChecked("courses.holes[].par")),
     makeTrait(
       "par_5_share",
-      parFives.length / holeCount,
+      parFives.length / holes.length,
       "share",
-      trustedHoles("courses.holes[].par"),
+      parChecked("courses.holes[].par"),
     ),
-  );
+  ];
+}
+
+/** Par-4 lengths read off the `holes` array: refused outright unless `holes_trusted` is `true`. */
+function parFourLengthTraits(course: CourseFacts): DerivedCourseTrait[] {
+  if (course.holesTrusted !== true || !course.holes || course.holes.length === 0) return [];
+  const holes = course.holes;
+
+  const traits: DerivedCourseTrait[] = [];
+  const parFours = holes.filter((h) => h.par === 4);
 
   const tee = course.holesCheckedTee;
   if (tee !== null && parFours.length > 0) {
@@ -217,5 +244,9 @@ function holeDerivedTraits(course: CourseFacts): DerivedCourseTrait[] {
 
 /** Derives every Course Trait this repo can currently measure from a stored course's facts. */
 export function deriveCourseTraits(course: CourseFacts): DerivedCourseTrait[] {
-  return [...courseLevelTraits(course), ...holeDerivedTraits(course)];
+  return [
+    ...courseLevelTraits(course),
+    ...parMixTraits(course),
+    ...parFourLengthTraits(course),
+  ];
 }

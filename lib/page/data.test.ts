@@ -5,6 +5,7 @@ import {
   TRUSTED_TRAITS,
   UNTRUSTED_COURSE,
   UNTRUSTED_TRAITS,
+  UNTRUSTED_TRAITS_WITH_PAR_MIX,
 } from "./fixtures";
 
 describe("matchCourse", () => {
@@ -58,9 +59,9 @@ describe("courseProfile", () => {
     );
   });
 
-  it("shows hole-derived Traits as unavailable, with the arithmetic, when holes are untrusted", () => {
+  it("shows the yardage-gated Traits as unavailable, with the arithmetic, when holes are untrusted", () => {
     const lines = courseProfile(UNTRUSTED_COURSE, UNTRUSTED_TRAITS);
-    for (const label of ["Par mix", "Par 5 share", "Mean par 4", "Longest par 4"]) {
+    for (const label of ["Mean par 4", "Longest par 4"]) {
       const line = lines.find((l) => l.label === label);
       expect(line?.value, label).toBeNull();
       expect(line && "reason" in line ? line.reason : "").toContain(
@@ -68,6 +69,32 @@ describe("courseProfile", () => {
       );
     }
     expect(lines.find((l) => l.label === "Length")?.value).toBe("7,555 yards");
+  });
+
+  it("shows the par mix as unavailable, naming the par check rather than the yardage sum, when it is not stored", () => {
+    const lines = courseProfile(UNTRUSTED_COURSE, UNTRUSTED_TRAITS);
+    for (const label of ["Par mix", "Par 5 share"]) {
+      const line = lines.find((l) => l.label === label);
+      expect(line?.value, label).toBeNull();
+      const reason = line && "reason" in line ? line.reason : "";
+      expect(reason).toContain("par check");
+      expect(reason).not.toContain("6,475 yards");
+    }
+  });
+
+  it("shows the par mix and par 5 share for an untrusted Course whose pars are sound, while the par-4 lengths stay refused", () => {
+    const lines = courseProfile(UNTRUSTED_COURSE, UNTRUSTED_TRAITS_WITH_PAR_MIX);
+    const byLabel = Object.fromEntries(lines.map((l) => [l.label, l.value]));
+    expect(byLabel["Par mix"]).toBe("4 par 3s, 10 par 4s, 4 par 5s");
+    expect(byLabel["Par 5 share"]).toBe("22% of holes");
+
+    for (const label of ["Mean par 4", "Longest par 4"]) {
+      const line = lines.find((l) => l.label === label);
+      expect(line?.value, label).toBeNull();
+      expect(line && "reason" in line ? line.reason : "").toContain(
+        "add up to 6,475 yards, 1,080 yards short of the published 7,555 yards",
+      );
+    }
   });
 
   it("never leaves a line blank", () => {
