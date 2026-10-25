@@ -32,6 +32,7 @@ async function main(): Promise<void> {
     .select({
       name: tournaments.name,
       startDate: tournaments.startDate,
+      endDate: tournaments.endDate,
       courseId: tournaments.courseId,
     })
     .from(tournaments);

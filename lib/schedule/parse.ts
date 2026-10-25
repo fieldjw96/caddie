@@ -148,10 +148,10 @@ function parseLocation(cell: string): string | null {
 }
 
 /** A standard PGA Tour tournament is played Thursday through Sunday, four days inclusive. */
-function endDateFromStart(startDate: string): string {
-  const start = new Date(`${startDate}T00:00:00Z`);
-  start.setUTCDate(start.getUTCDate() + 3);
-  return start.toISOString().slice(0, 10);
+function startDateFromEnd(endDate: string): string {
+  const end = new Date(`${endDate}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() - 3);
+  return end.toISOString().slice(0, 10);
 }
 
 /**
@@ -188,13 +188,13 @@ export function parseSchedule(sectionWikitext: string, season: number): Schedule
     }
 
     const { target, display } = parseWikilink(tournamentResult.data);
-    const startDate = parseDate(dateResult.data, season);
+    const endDate = parseDate(dateResult.data, season);
 
     return {
       name: display,
       pageTitle: target,
-      startDate,
-      endDate: endDateFromStart(startDate),
+      startDate: startDateFromEnd(endDate),
+      endDate,
       location: parseLocation(locationCell!),
       canceled,
     };
