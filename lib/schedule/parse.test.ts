@@ -95,13 +95,27 @@ describe("parseSchedule", () => {
     });
   });
 
-  it("turns 'Mon D' plus the season into an ISO start date, and adds three days for the end date", () => {
+  it("turns 'Mon D' plus the season into an ISO end date, and subtracts three days for the start date", () => {
     expect(rows[1]).toMatchObject({
       name: "Sony Open in Hawaii",
-      startDate: "2026-01-18",
-      endDate: "2026-01-21",
+      startDate: "2026-01-15",
+      endDate: "2026-01-18",
       canceled: false,
     });
+  });
+
+  it("subtracts three days from the end date across a month boundary", () => {
+    expect(rows[2]).toMatchObject({
+      name: "Masters Tournament",
+      startDate: "2026-04-09",
+      endDate: "2026-04-12",
+    });
+  });
+
+  it("subtracts three days from the end date across a month boundary going backwards too", () => {
+    const section = SECTION_WIKITEXT.replace("|Apr 26", "|Mar 1");
+    const march = parseSchedule(section, 2026);
+    expect(march[3]).toMatchObject({ startDate: "2026-02-26", endDate: "2026-03-01" });
   });
 
   it("keeps the Location cell as plain text", () => {
