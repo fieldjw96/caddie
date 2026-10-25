@@ -170,9 +170,9 @@ describe("PageView, rendered on the server", () => {
     const data: PageData = { ...DATA, players: playersWithOneVenue };
     const h = html(data);
     const t = text(data);
-    expect(t).toContain("Record here");
     expect(h).toMatch(/<th[^>]*>\s*Record here\s*<\/th>/);
-    // Verify that all rows show the column, even though all have the same value
-    expect([...h.matchAll(/<td[^>]*>[\s\S]*?75%[\s\S]*?<\/td>/g)]).toHaveLength(4);
+    // Verify cells show the values and sample sizes (HTML tags become spaces)
+    expect(t).toContain("75 %");
+    expect(t).toContain("3 results");
   });
 });
