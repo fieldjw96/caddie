@@ -107,31 +107,39 @@ describe("deriveCourseTraits", () => {
     }
   });
 
-  it("tags every Trait with whether it came from trusted hole data or course-level data", () => {
+  it("tags every Trait with whether it came from course-level data, the par check, or trusted hole yardages", () => {
     const traits = deriveCourseTraits(trustedCourse());
     const courseLevelNames = ["length_yards", "par", "slope_rating_gap"];
-    const holeDerivedNames = [
-      "par_3_count",
-      "par_4_count",
-      "par_5_count",
-      "par_5_share",
-      "longest_par_4_yards",
-      "mean_par_4_yards",
-    ];
+    const parMixNames = ["par_3_count", "par_4_count", "par_5_count", "par_5_share"];
+    const yardageDerivedNames = ["longest_par_4_yards", "mean_par_4_yards"];
 
     for (const name of courseLevelNames) {
       expect(byTrait(traits, name)?.derivation).toMatch(/course-level/);
     }
-    for (const name of holeDerivedNames) {
+    for (const name of parMixNames) {
+      expect(byTrait(traits, name)?.derivation).toMatch(/par check/);
+    }
+    for (const name of yardageDerivedNames) {
       expect(byTrait(traits, name)?.derivation).toMatch(/trusted hole/);
     }
   });
 
-  it("refuses every hole-derived Trait, and none of them fall back to a course-level number, when holes_trusted is false", () => {
+  it("still derives the par mix and par 5 share, but refuses the par-4 lengths, when holes_trusted is false and the pars are sound", () => {
     const traits = deriveCourseTraits(trustedCourse({ holesTrusted: false }));
     const names = traits.map((t) => t.trait).sort();
 
-    expect(names).toEqual(["length_yards", "par", "slope_rating_gap"].sort());
+    expect(names).toEqual(
+      [
+        "length_yards",
+        "par",
+        "slope_rating_gap",
+        "par_3_count",
+        "par_4_count",
+        "par_5_count",
+        "par_5_share",
+      ].sort(),
+    );
+    expect(byTrait(traits, "par_5_share")).toMatchObject({ value: 4 / 18 });
   });
 
   it("refuses every hole-derived Trait when holes_trusted has never been checked", () => {
@@ -143,15 +151,31 @@ describe("deriveCourseTraits", () => {
     expect(names).toEqual(["length_yards", "par", "slope_rating_gap"].sort());
   });
 
-  it("refuses Augusta's hole-derived Traits, whose holes are 1,080 yards short of the card", () => {
+  it("refuses Augusta's par-4 length Traits, whose holes are 1,080 yards short of the card, but still derives its par mix", () => {
     const course = parse(courseResponse, augusta, "fixture");
     const row = toCourseRow(course, "attribution");
     expect(row.holesTrusted).toBe(false);
 
     const traits = deriveCourseTraits(asCourseFacts(row));
     const names = traits.map((t) => t.trait).sort();
-    expect(names).toEqual(["length_yards", "par", "slope_rating_gap"].sort());
+    expect(names).toEqual(
+      [
+        "length_yards",
+        "par",
+        "slope_rating_gap",
+        "par_3_count",
+        "par_4_count",
+        "par_5_count",
+        "par_5_share",
+      ].sort(),
+    );
     expect(byTrait(traits, "length_yards")?.value).toBe(7445);
+    expect(byTrait(traits, "par_3_count")).toMatchObject({ value: 4 });
+    expect(byTrait(traits, "par_4_count")).toMatchObject({ value: 10 });
+    expect(byTrait(traits, "par_5_count")).toMatchObject({ value: 4 });
+    expect(byTrait(traits, "par_5_share")).toMatchObject({ value: 4 / 18 });
+    expect(byTrait(traits, "longest_par_4_yards")).toBeUndefined();
+    expect(byTrait(traits, "mean_par_4_yards")).toBeUndefined();
   });
 
   it("yields the rest, not throwing, when a course has no tee matching the published yardage", () => {
@@ -194,12 +218,15 @@ describe("deriveCourseTraits", () => {
   });
 
   it("does not crash the mix calculation for a course with no par 5s", () => {
-    const holes: CourseHole[] = trustedHoles().filter((h) => h.par !== 5);
-    const traits = deriveCourseTraits(trustedCourse({ holes }));
+    // The four par 5s become par 4s instead, keeping 18 holes and the pars summing to par.
+    const holes: CourseHole[] = trustedHoles().map((h) =>
+      h.par === 5 ? { ...h, par: 4 } : h,
+    );
+    const traits = deriveCourseTraits(trustedCourse({ holes, par: 68 }));
 
     expect(byTrait(traits, "par_5_count")).toMatchObject({ value: 0 });
     expect(byTrait(traits, "par_5_share")).toMatchObject({ value: 0 });
-    expect(byTrait(traits, "longest_par_4_yards")).toMatchObject({ value: 450 });
+    expect(byTrait(traits, "longest_par_4_yards")).toMatchObject({ value: 550 });
   });
 
   it("omits the par-4 length Traits, rather than computing them from a partial set, when a par 4 is missing a yardage at the checked tee", () => {
@@ -250,6 +277,36 @@ describe("deriveCourseTraits", () => {
         trustedCourse({ holesTrusted: false, altitude: 5000 }),
       );
       expect(byTrait(traits, "altitude_adjusted_length_yards")).toBeDefined();
+    });
+  });
+
+  describe("the par check", () => {
+    const noParTraits = (traits: DerivedCourseTrait[]) => {
+      for (const name of ["par_3_count", "par_4_count", "par_5_count", "par_5_share"]) {
+        expect(byTrait(traits, name), name).toBeUndefined();
+      }
+    };
+
+    it("yields no par Trait for a course with 17 holes", () => {
+      const holes = trustedHoles().slice(0, 17);
+      const traits = deriveCourseTraits(trustedCourse({ holes }));
+      noParTraits(traits);
+    });
+
+    it("yields no par Trait for a course with a hole missing its par", () => {
+      const holes = trustedHoles();
+      const firstHole = holes[0]!;
+      holes[0] = { ...firstHole, par: null };
+      const traits = deriveCourseTraits(trustedCourse({ holes }));
+      noParTraits(traits);
+    });
+
+    it("yields no par Trait for a course whose pars sum to 71 against a published 72", () => {
+      const holes = trustedHoles();
+      const firstPar5 = holes.find((h) => h.par === 5)!;
+      firstPar5.par = 4;
+      const traits = deriveCourseTraits(trustedCourse({ holes }));
+      noParTraits(traits);
     });
   });
 });

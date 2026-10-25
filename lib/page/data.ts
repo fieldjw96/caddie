@@ -157,12 +157,26 @@ export function holesUnavailableReason(course: CourseView | null): string {
 }
 
 /**
+ * Why the par mix and par 5 share are missing: the par check, never the yardage sum, since
+ * these two rest on the holes' pars rather than their yardages and are derived whatever
+ * `holes_trusted` says.
+ */
+export function parUnavailableReason(course: CourseView | null): string {
+  if (course === null) return "No Course is matched to this Tournament.";
+  if (course.source === "wikipedia") {
+    return "Not shown: this Course comes from the Tournament's own Wikipedia article, which states a published total rather than a hole-by-hole card.";
+  }
+  return "Not shown: this Course fails the par check — not exactly 18 holes, each an integer par, summing to the published par — so the par mix is refused.";
+}
+
+/**
  * The Course Profile, in the Traits' natural units, in the order a reader asks about a
  * Course. Every line is present whether or not it is known: an unknown Trait says why.
  */
 export function courseProfile(course: CourseView | null, traits: StoredTraits): ProfileLine[] {
   const noCourse = "No Course is matched to this Tournament, so none of its facts are held.";
   const holes = holesUnavailableReason(course);
+  const parMix = parUnavailableReason(course);
   const courseLevel = course === null ? noCourse : null;
   const t = (name: string) => traits[name]?.value;
 
@@ -206,14 +220,14 @@ export function courseProfile(course: CourseView | null, traits: StoredTraits): 
           label: "Par mix",
           value: `${threes} par 3s, ${fours} par 4s, ${fives} par 5s`,
         }
-      : { label: "Par mix", value: null, reason: holes },
+      : { label: "Par mix", value: null, reason: parMix },
   );
 
   const share = t("par_5_share");
   lines.push(
     share !== undefined
       ? { label: "Par 5 share", value: `${Math.round(share * 100)}% of holes` }
-      : { label: "Par 5 share", value: null, reason: holes },
+      : { label: "Par 5 share", value: null, reason: parMix },
   );
 
   const mean = t("mean_par_4_yards");
