@@ -163,16 +163,17 @@ describe("PageView, rendered on the server", () => {
   });
 
   it("shows the Record here column when at least one Player has a venue record value", () => {
-    const playersWithOneVenue: typeof PLAYERS = PLAYERS.map((p) => ({
+    const playersWithOneVenue: typeof PLAYERS = PLAYERS.map((p, i) => ({
       ...p,
-      venueRecord: { value: 0.75, sampleSize: 3 },
+      venueRecord: i === 0 ? { value: 0.75, sampleSize: 3 } : { value: null, sampleSize: 0 },
     }));
     const data: PageData = { ...DATA, players: playersWithOneVenue };
     const h = html(data);
     const t = text(data);
     expect(h).toMatch(/<th[^>]*>\s*Record here\s*<\/th>/);
-    // Verify cells show the values and sample sizes (HTML tags become spaces)
+    // Verify cells show the values and "no record" for Players without a venue record value
     expect(t).toContain("75 %");
     expect(t).toContain("3 results");
+    expect(t).toContain("no record");
   });
 });

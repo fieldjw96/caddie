@@ -125,7 +125,7 @@ export function PageView({ data }: { data: PageData | null }) {
 
   const { tournament, course, traits, players, coverage } = data;
   const profile = courseProfile(course, traits);
-  const hasVenue = players.some((p) => p.venueRecord?.value !== null);
+  const hasVenue = players.some((p) => p.venueRecord !== null && p.venueRecord.value !== null);
   const courseName = course?.name ?? tournament.courseName;
   const holesTrusted = course?.holesTrusted === true;
 
