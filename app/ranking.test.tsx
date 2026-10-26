@@ -262,6 +262,29 @@ describe("Ranking", () => {
     for (const player of PLAYERS) expect(answerText).not.toContain(player.name);
   });
 
+  it("pins the # and Player cells horizontally and lets the wrapper scroll only sideways below sm", () => {
+    renderRanking();
+    const table = screen.getByRole("table");
+    const headerRow = table.querySelector<HTMLTableRowElement>("thead tr");
+    const bodyRow = row("Casey Clark");
+    const pinnedCells = [
+      headerRow?.cells[0],
+      headerRow?.cells[1],
+      bodyRow?.cells[0],
+      bodyRow?.cells[1],
+    ];
+    for (const cell of pinnedCells) {
+      expect(cell?.className).toMatch(/\bsticky\b/);
+      expect(cell?.className).toMatch(/\bleft-\S+/);
+    }
+    expect(headerRow?.cells).toHaveLength(13);
+
+    const wrapper = table.parentElement;
+    const classes = wrapper?.className.split(/\s+/) ?? [];
+    expect(classes.filter((c) => c.includes("max-h-"))).toEqual(["sm:max-h-[36rem]"]);
+    expect(classes).toContain("overflow-x-auto");
+  });
+
   it("says no Player has enough results, naming no Player, when every Player is unscored for their record", () => {
     // Every Player here has every Strength null, but the Course asks something on the
     // declared Weightings, so this is reason 3 (the record), with nobody scored at all.

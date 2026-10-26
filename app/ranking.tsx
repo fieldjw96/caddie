@@ -300,14 +300,20 @@ export function Ranking({
               : courseOrWeightingsSentence}
           </p>
         ) : (
-          <div className="mt-4 max-h-[36rem] overflow-auto rounded border border-rule">
+          <div className="mt-4 overflow-x-auto rounded border border-rule sm:max-h-[36rem] sm:overflow-y-auto">
             <table className="w-full min-w-[68rem] border-collapse text-sm">
               <thead className="sticky top-0 bg-panel text-xs text-muted">
                 <tr>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                  <th
+                    scope="col"
+                    className="sticky left-0 z-20 w-12 bg-panel px-2 py-2 text-right font-medium"
+                  >
                     #
                   </th>
-                  <th scope="col" className="px-2 py-2 text-left font-medium">
+                  <th
+                    scope="col"
+                    className="sticky left-12 z-20 min-w-[9rem] bg-panel px-2 py-2 text-left font-medium"
+                  >
                     Player
                   </th>
                   <th scope="col" className="px-2 py-2 text-right font-medium">
@@ -344,10 +350,13 @@ export function Ranking({
                     className="border-t border-rule"
                     data-player={player.name}
                   >
-                    <td className="px-2 py-1.5 text-right align-top text-muted">
+                    <td className="sticky left-0 z-10 w-12 bg-paper px-2 py-1.5 text-right align-top text-muted">
                       {index + 1}
                     </td>
-                    <th scope="row" className="px-2 py-1.5 text-left align-top font-medium">
+                    <th
+                      scope="row"
+                      className="sticky left-12 z-10 min-w-[9rem] bg-paper px-2 py-1.5 text-left align-top font-medium"
+                    >
                       {player.name}
                       {player.country && (
                         <span className="block text-xs font-normal text-muted">
