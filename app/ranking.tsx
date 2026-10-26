@@ -15,6 +15,7 @@ import {
   rankFits,
   type FitComponent,
   type FitCourseTraits,
+  type FitScore,
   type FitStrengthName,
   type FitTraitName,
   type Weightings,
@@ -85,6 +86,31 @@ function ContributionCell({ component }: { component: FitComponent }) {
 
 const subscribeNothing = () => () => {};
 
+/** The names and results counts of every unscored Player, collapsible past 40. */
+function UnscoredList({
+  unscored,
+}: {
+  unscored: readonly { player: PlayerView; fit: FitScore }[];
+}) {
+  return (
+    <details className="mt-3 rounded border border-rule p-3" open={unscored.length <= 40}>
+      <summary className="cursor-pointer text-sm font-medium">
+        Show all {unscored.length}
+      </summary>
+      <ul className="mt-3 columns-1 gap-6 text-sm sm:columns-2 lg:columns-3">
+        {unscored.map(({ player }) => (
+          <li key={player.id} className="break-inside-avoid py-0.5">
+            {player.name}{" "}
+            <span className="text-xs text-muted">
+              ({results(player.skill?.sampleSize ?? 0)})
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function Ranking({
   players,
   traits,
@@ -125,26 +151,58 @@ export function Ranking({
     };
   }, [players, traits, deferred]);
 
-  // The known Traits sitting at or below the bottom of their range. This is a property of
-  // the Course alone, never the Weightings: a Trait zero-weighted by the slider still asks
-  // something of the Course, it is just not being counted right now, so it does not belong
-  // here and must not be named as a reason nothing separates the Players.
-  const blockingTraits = useMemo(
-    () =>
-      FIT_TRAITS.flatMap((trait) => {
-        const value = traits[trait] ?? null;
-        return value !== null && value <= TRAIT_SCALES[trait].min ? [{ trait, value }] : [];
-      }),
-    [traits],
+  // The Course's own fit, with no Player's Strengths at all: every contribution is unknown,
+  // but `demand` and each component's `normalised` do not depend on a Player's Strengths, so
+  // this is the same for every Player and is read once rather than per row.
+  const courseFit = useMemo(() => fitScore(traits, {}, deferred), [traits, deferred]);
+  const knownTraits = useMemo(
+    () => courseFit.components.filter((c) => c.normalised !== null),
+    [courseFit],
   );
-  const knownTraitCount = FIT_TRAITS.filter((t) => (traits[t] ?? null) !== null).length;
-  // True only when every known Trait is below its range, so the sentence naming them as the
-  // reason is actually true. If some other known Trait is merely zero-weighted right now, it
-  // is not why nothing separates the Players, and this stays false.
-  const nothingSeparates =
-    ranked.scored.length === 0 &&
-    knownTraitCount > 0 &&
-    blockingTraits.length === knownTraitCount;
+  // The known Traits sitting at or below the bottom of their range: the reason nothing
+  // separates the Players when every known Trait is one of these.
+  const blockingTraits = useMemo(
+    () => knownTraits.filter((c) => c.normalised === 0),
+    [knownTraits],
+  );
+  // The known Traits the Course asks something of, whatever the current Weightings do with
+  // that. If this is empty, the Course itself is why nothing separates the Players; if it is
+  // not empty but `demand` is still zero, every one of these is weighted zero, and the
+  // Weightings, not the Course, are why.
+  const askingTraits = useMemo(
+    () => knownTraits.filter((c) => c.normalised !== null && c.normalised > 0),
+    [knownTraits],
+  );
+  // Why an unscored Player has no Fit Score, read off courseFit rather than asserted. This is
+  // the same for every unscored Player: "record" can only happen once `demand` is positive,
+  // because a Fit Score needs some known Trait with weight x normalised > 0 to be non-null at
+  // all, so when `demand` is zero no Player can ever score, whatever their record.
+  const unscoredReason: "course" | "weightings" | "record" =
+    courseFit.demand > 0 ? "record" : askingTraits.length > 0 ? "weightings" : "course";
+  // The sentence naming the reason when it is "course" or "weightings", shared between the
+  // ranking section's fallback and the unscored section below it, so both use the same terms.
+  const courseOrWeightingsSentence =
+    unscoredReason === "weightings" ? (
+      <>
+        This Course asks something of{" "}
+        {askingTraits.map((c) => TRAIT_LABELS[c.trait]).join(", ")}, but the current Weightings
+        count none of it: every Trait it asks something of is weighted zero.
+      </>
+    ) : knownTraits.length === 0 ? (
+      <>This Course has no known Fit Trait, so nothing separates the Players.</>
+    ) : (
+      <>
+        This Course&rsquo;s known Traits all sit at or below the bottom of their ranges on the
+        current Weightings, so nothing separates the Players:{" "}
+        {blockingTraits
+          .map(
+            (c) =>
+              `${TRAIT_LABELS[c.trait]} is ${formatRangeEnd(c.trait, c.traitValue ?? 0)}, at or below the minimum of ${formatRangeEnd(c.trait, c.range.min)}`,
+          )
+          .join("; ")}
+        .
+      </>
+    );
 
   const changed = FIT_TRAITS.some((t) => weightings[t] !== DEFAULT_WEIGHTINGS[t]);
   const totalWeight = FIT_TRAITS.reduce((sum, t) => sum + weightings[t], 0);
@@ -168,22 +226,10 @@ export function Ranking({
 
         {ranked.scored.length === 0 ? (
           <p className="mt-4 rounded border border-rule bg-gap-panel p-3 text-sm">
-            {nothingSeparates ? (
-              <>
-                This Course&rsquo;s known Traits all sit at or below the bottom of their ranges
-                on the current Weightings, so nothing separates the Players:{" "}
-                {blockingTraits
-                  .map(
-                    ({ trait, value }) =>
-                      `${TRAIT_LABELS[trait]} is ${formatRangeEnd(trait, value)}, at or below the minimum of ${formatRangeEnd(trait, TRAIT_SCALES[trait].min)}`,
-                  )
-                  .join("; ")}
-                .
-              </>
-            ) : (
-              "No Player has a Fit Score: either no Course Trait is known for this Course, or " +
-              "no Player has enough results for a Strength."
-            )}
+            {unscoredReason === "record"
+              ? "No Player has a Fit Score: no Player has enough results for a Strength this " +
+                "Course asks for."
+              : courseOrWeightingsSentence}
           </p>
         ) : (
           <div className="mt-4 max-h-[36rem] overflow-auto rounded border border-rule">
@@ -338,37 +384,31 @@ export function Ranking({
         )}
       </section>
 
-      <section aria-labelledby="no-record" className="mt-10">
-        <h2 id="no-record" className="text-xl font-semibold">
-          Players with no usable record
-        </h2>
-        <p className="mt-2 max-w-prose text-sm text-muted">
-          {ranked.unscored.length} Players have no Fit Score, because no Strength the current
-          Weightings call for rests on enough of their results to state. They are not ranked
-          last: unknown is not bad, and most of them simply played events no source we can
-          publish from covers.
-        </p>
-        {ranked.unscored.length > 0 && (
-          <details
-            className="mt-3 rounded border border-rule p-3"
-            open={ranked.unscored.length <= 40}
-          >
-            <summary className="cursor-pointer text-sm font-medium">
-              Show all {ranked.unscored.length}
-            </summary>
-            <ul className="mt-3 columns-1 gap-6 text-sm sm:columns-2 lg:columns-3">
-              {ranked.unscored.map(({ player }) => (
-                <li key={player.id} className="break-inside-avoid py-0.5">
-                  {player.name}{" "}
-                  <span className="text-xs text-muted">
-                    ({results(player.skill?.sampleSize ?? 0)})
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-      </section>
+      {ranked.unscored.length > 0 &&
+        (unscoredReason === "record" ? (
+          <section aria-labelledby="no-record" className="mt-10">
+            <h2 id="no-record" className="text-xl font-semibold">
+              Players with no usable record
+            </h2>
+            <p className="mt-2 max-w-prose text-sm text-muted">
+              {ranked.unscored.length} Players have no Fit Score, because no Strength the
+              current Weightings call for rests on enough of their results to state. They are
+              not ranked last: unknown is not bad, and most of them simply played events no
+              source we can publish from covers.
+            </p>
+            <UnscoredList unscored={ranked.unscored} />
+          </section>
+        ) : (
+          <section aria-labelledby="unscored" className="mt-10">
+            <h2 id="unscored" className="text-xl font-semibold">
+              {unscoredReason === "weightings"
+                ? "No Player has a Fit Score on the current Weightings"
+                : "No Player has a Fit Score at this Course"}
+            </h2>
+            <p className="mt-2 max-w-prose text-sm text-muted">{courseOrWeightingsSentence}</p>
+            <UnscoredList unscored={ranked.unscored} />
+          </section>
+        ))}
     </>
   );
 }
