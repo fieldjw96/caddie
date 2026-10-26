@@ -123,27 +123,22 @@ function Answer({
 
   const top3 = ranked.scored.slice(0, 3);
   const leader = top3[0]!;
-  const positive = leader.fit.components.filter(
-    (c): c is FitComponent & { contribution: number } =>
-      c.contribution !== null && c.contribution > 0,
+  // A scored Player has at least one known contribution (fitScore.score is only non-null when
+  // some component's weight x normalised x edge separates the field), so this always finds a
+  // leading Trait even when every known contribution is zero or negative: the Trait is still
+  // the largest, just not an edge in the field's favour.
+  const known = leader.fit.components.filter(
+    (c): c is FitComponent & { contribution: number } => c.contribution !== null,
   );
-  const leading =
-    positive.length > 0
-      ? positive.reduce((best, c) => (c.contribution > best.contribution ? c : best))
-      : null;
+  const leading = known.reduce((best, c) => (c.contribution > best.contribution ? c : best));
   const names = listInWords(top3.map(({ player }) => player.name));
 
   return (
     <p data-testid="answer" className="mt-3 max-w-prose text-lg">
       On the current Weightings, {names} {top3.length > 1 ? "lead" : "leads"} the field by Fit
-      Score.
-      {leading && (
-        <>
-          {" "}
-          {leader.player.name}&rsquo;s biggest edge comes from {TRAIT_LABELS[leading.trait]},
-          which calls for {STRENGTH_LABELS[TRAIT_SCALES[leading.trait].calls]}.
-        </>
-      )}
+      Score. {leader.player.name}&rsquo;s largest contribution comes from{" "}
+      {TRAIT_LABELS[leading.trait]}, which calls for{" "}
+      {STRENGTH_LABELS[TRAIT_SCALES[leading.trait].calls]}.
     </p>
   );
 }

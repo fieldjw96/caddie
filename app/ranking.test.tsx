@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FIT_TRAITS, TRAIT_SCALES } from "../lib/fit";
-import { fitTraits } from "../lib/page/data";
+import { fitTraits, type PlayerView } from "../lib/page/data";
 import { PLAYERS, TRUSTED_TRAITS } from "../lib/page/fixtures";
 import { Ranking } from "./ranking";
 
@@ -89,6 +89,39 @@ describe("Ranking", () => {
     expect(text).toContain("Length");
     expect(text).toContain("Skill");
     expect(text).not.toMatch(/\b(win|winner|favou?rite|tip|bet|odds|predict|will finish)\b/i);
+  });
+
+  it("names the leading Trait and Strength even when every known contribution is zero or negative", () => {
+    // Only length_yards is known, at the top of its range, so it is the one Trait that can
+    // separate these Players; both are below the middle on Skill, so every known contribution
+    // is negative, yet Lowe still leads by being the less negative of the two.
+    const players: PlayerView[] = [
+      {
+        id: 101,
+        name: "Nat Lowe",
+        country: null,
+        skill: { value: 0.3, sampleSize: 10 },
+        consistency: null,
+        lowRounds: null,
+        form: null,
+        venueRecord: null,
+      },
+      {
+        id: 102,
+        name: "Pat Reed",
+        country: null,
+        skill: { value: 0.1, sampleSize: 10 },
+        consistency: null,
+        lowRounds: null,
+        form: null,
+        venueRecord: null,
+      },
+    ];
+    render(<Ranking players={players} traits={{ length_yards: 7_800 }} hasVenue={false} />);
+    const text = answer().textContent ?? "";
+    expect(text).toContain("Nat Lowe");
+    expect(text).toContain("Length");
+    expect(text).toContain("Skill");
   });
 
   it("shows a null Strength as no record with its sample, never a zero or a blank", () => {
