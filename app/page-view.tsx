@@ -147,36 +147,38 @@ export function PageView({ data }: { data: PageData | null }) {
         </p>
       </header>
 
-      <section aria-labelledby="course" className="mt-8">
-        <h2 id="course" className="text-xl font-semibold">
-          The Course{course ? `: ${course.name}` : ""}
-        </h2>
-        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-          {profile.map((line) => (
-            <div
-              key={line.label}
-              className="flex flex-col border-b border-rule pb-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3"
-            >
-              <dt className="text-sm text-muted">{line.label}</dt>
-              {line.value !== null ? (
-                <dd className="text-lg font-semibold sm:text-right">
-                  {line.value}
-                  {"detail" in line && line.detail && (
-                    <span className="block text-xs font-normal text-muted">{line.detail}</span>
-                  )}
-                </dd>
-              ) : (
-                <dd className="text-sm text-gap sm:max-w-[60%] sm:text-right">
-                  <span className="font-semibold">Unavailable.</span>{" "}
-                  {line.reason.replace(/^Not shown: /, "")}
-                </dd>
-              )}
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      <Ranking players={players} traits={fitTraits(traits)} hasVenue={hasVenue} />
+      <Ranking players={players} traits={fitTraits(traits)} hasVenue={hasVenue}>
+        <section aria-labelledby="course" className="mt-8">
+          <h2 id="course" className="text-xl font-semibold">
+            The Course{course ? `: ${course.name}` : ""}
+          </h2>
+          <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+            {profile.map((line) => (
+              <div
+                key={line.label}
+                className="flex flex-col border-b border-rule pb-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3"
+              >
+                <dt className="text-sm text-muted">{line.label}</dt>
+                {line.value !== null ? (
+                  <dd className="text-lg font-semibold sm:text-right">
+                    {line.value}
+                    {"detail" in line && line.detail && (
+                      <span className="block text-xs font-normal text-muted">
+                        {line.detail}
+                      </span>
+                    )}
+                  </dd>
+                ) : (
+                  <dd className="text-sm text-gap sm:max-w-[60%] sm:text-right">
+                    <span className="font-semibold">Unavailable.</span>{" "}
+                    {line.reason.replace(/^Not shown: /, "")}
+                  </dd>
+                )}
+              </div>
+            ))}
+          </dl>
+        </section>
+      </Ranking>
 
       <section aria-labelledby="unknowns" className="mt-10">
         <h2 id="unknowns" className="text-xl font-semibold">

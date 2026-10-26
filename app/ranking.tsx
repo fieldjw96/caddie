@@ -18,9 +18,10 @@ import {
   type FitScore,
   type FitStrengthName,
   type FitTraitName,
+  type RankedFits,
   type Weightings,
 } from "../lib/fit";
-import type { PlayerView, StrengthView } from "../lib/page/data";
+import { listInWords, type PlayerView, type StrengthView } from "../lib/page/data";
 
 export const TRAIT_LABELS: Readonly<Record<FitTraitName, string>> = {
   length_yards: "Length",
@@ -84,6 +85,69 @@ function ContributionCell({ component }: { component: FitComponent }) {
   return <td className="px-2 py-1.5 text-right align-top whitespace-nowrap">{body}</td>;
 }
 
+/**
+ * The answer the site exists to give, read off the same `ranked` result the table below
+ * renders rather than worked out again. When nothing separates the Players it says so and
+ * gives the same reason the ranking section does, naming no Player; otherwise it names the
+ * top three by Fit Score and, for the leader, the Trait behind most of their score and the
+ * Strength that Trait calls for.
+ */
+function Answer({
+  ranked,
+  unscoredReason,
+  courseOrWeightingsSentence,
+}: {
+  ranked: RankedFits<PlayerView>;
+  unscoredReason: "course" | "weightings" | "record";
+  courseOrWeightingsSentence: React.ReactNode;
+}) {
+  if (ranked.scored.length === 0) {
+    return (
+      <p data-testid="answer" className="mt-3 max-w-prose text-lg">
+        {unscoredReason === "course" ? (
+          courseOrWeightingsSentence
+        ) : unscoredReason === "weightings" ? (
+          <>
+            Nothing separates the Players on the current Weightings:{" "}
+            {courseOrWeightingsSentence}
+          </>
+        ) : (
+          <>
+            Nothing separates the Players: no Player has enough results for a Strength this
+            Course asks for.
+          </>
+        )}
+      </p>
+    );
+  }
+
+  const top3 = ranked.scored.slice(0, 3);
+  const leader = top3[0]!;
+  const positive = leader.fit.components.filter(
+    (c): c is FitComponent & { contribution: number } =>
+      c.contribution !== null && c.contribution > 0,
+  );
+  const leading =
+    positive.length > 0
+      ? positive.reduce((best, c) => (c.contribution > best.contribution ? c : best))
+      : null;
+  const names = listInWords(top3.map(({ player }) => player.name));
+
+  return (
+    <p data-testid="answer" className="mt-3 max-w-prose text-lg">
+      On the current Weightings, {names} {top3.length > 1 ? "lead" : "leads"} the field by Fit
+      Score.
+      {leading && (
+        <>
+          {" "}
+          {leader.player.name}&rsquo;s biggest edge comes from {TRAIT_LABELS[leading.trait]},
+          which calls for {STRENGTH_LABELS[TRAIT_SCALES[leading.trait].calls]}.
+        </>
+      )}
+    </p>
+  );
+}
+
 const subscribeNothing = () => () => {};
 
 /** The names and results counts of every unscored Player, collapsible past 40. */
@@ -115,10 +179,13 @@ export function Ranking({
   players,
   traits,
   hasVenue,
+  children,
 }: {
   players: readonly PlayerView[];
   traits: FitCourseTraits;
   hasVenue: boolean;
+  /** The Course Profile section, rendered between the answer and the ranking below it. */
+  children?: React.ReactNode;
 }) {
   const [weightings, setWeightings] = useState<Weightings>(DEFAULT_WEIGHTINGS);
   const deferred = useDeferredValue(weightings);
@@ -209,6 +276,12 @@ export function Ranking({
 
   return (
     <>
+      <Answer
+        ranked={ranked}
+        unscoredReason={unscoredReason}
+        courseOrWeightingsSentence={courseOrWeightingsSentence}
+      />
+      {children}
       <section aria-labelledby="ranking" className="mt-10">
         <h2 id="ranking" className="text-xl font-semibold">
           The roster, ordered by Fit Score

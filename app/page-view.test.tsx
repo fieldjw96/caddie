@@ -150,6 +150,25 @@ describe("PageView, rendered on the server", () => {
     expect(text(null)).toContain("No upcoming PGA Tour Tournament is stored");
   });
 
+  it("states the answer before the Course Profile heading, in document order", () => {
+    const container = document.createElement("div");
+    container.innerHTML = html(DATA);
+    const answerEl = container.querySelector('[data-testid="answer"]');
+    const courseHeading = container.querySelector("#course");
+    expect(answerEl).not.toBeNull();
+    expect(courseHeading).not.toBeNull();
+    // DOCUMENT_POSITION_FOLLOWING (4): courseHeading comes after answerEl.
+    expect(
+      answerEl!.compareDocumentPosition(courseHeading!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("names the top three Players and the leader's biggest Trait in the answer, never a forecast", () => {
+    const t = text(DATA);
+    expect(t).toContain("Casey Clark");
+    expect(t).not.toMatch(/\b(win|winner|favou?rite|tip|bet|odds|predict|will finish)\b/i);
+  });
+
   it("hides the Record here column when no Player has a venue record value", () => {
     const playersNoVenueValue: typeof PLAYERS = PLAYERS.map((p) => ({
       ...p,

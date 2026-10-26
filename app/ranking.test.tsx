@@ -41,6 +41,10 @@ function renderRanking() {
   );
 }
 
+function answer(): HTMLElement {
+  return screen.getByTestId("answer");
+}
+
 describe("Ranking", () => {
   it("orders the Players with a Fit Score on the declared Weightings", () => {
     renderRanking();
@@ -49,6 +53,7 @@ describe("Ranking", () => {
 
   it("reorders, and updates each row's numbers, when a Weighting slider moves", () => {
     renderRanking();
+    expect(answer().textContent).toContain("Casey Clark");
     const before = scoreOf("Blair Baker");
     for (const label of ["Length", "Slope against rating", "Mean par 4", "Longest par 4"]) {
       fireEvent.change(screen.getByLabelText(label), { target: { value: "0" } });
@@ -62,10 +67,28 @@ describe("Ranking", () => {
     // Trait that counts: nothing known is left, so Adams moves to the no-record section, not the
     // bottom. Adams's strong Form does not save a place: Form is in no Trait.
     expect(within(noRecordSection()).getByText(/Alex Adams/)).toBeTruthy();
+    // The answer is read off the same ranked result, so it now names the new leader, with
+    // fewer than three Players scored.
+    expect(answer().textContent).toContain("Blair Baker and Casey Clark");
+    expect(answer().textContent).not.toContain("Alex Adams");
+    expect(answer().textContent).toContain("Par 5 share");
+    expect(answer().textContent).toContain("Low rounds");
 
     fireEvent.click(screen.getByRole("button", { name: "Back to the declared Weightings" }));
     expect(order()).toEqual(["Casey Clark", "Blair Baker", "Alex Adams"]);
     expect(scoreOf("Blair Baker")).toBe(before);
+    expect(answer().textContent).toContain("Casey Clark");
+  });
+
+  it("states the answer above the Course section, naming the top three Players in order and the leader's biggest Trait and Strength", () => {
+    renderRanking();
+    const text = answer().textContent ?? "";
+    expect(text).toContain("Casey Clark, Blair Baker and Alex Adams");
+    expect(text.indexOf("Casey Clark")).toBeLessThan(text.indexOf("Blair Baker"));
+    expect(text.indexOf("Blair Baker")).toBeLessThan(text.indexOf("Alex Adams"));
+    expect(text).toContain("Length");
+    expect(text).toContain("Skill");
+    expect(text).not.toMatch(/\b(win|winner|favou?rite|tip|bet|odds|predict|will finish)\b/i);
   });
 
   it("shows a null Strength as no record with its sample, never a zero or a blank", () => {
@@ -125,6 +148,11 @@ describe("Ranking", () => {
     for (const player of PLAYERS) {
       expect(within(section).getByText(new RegExp(player.name))).toBeTruthy();
     }
+    // The Port Royal case: the answer gives the same reason, and names no Player.
+    const answerText = answer().textContent ?? "";
+    expect(answerText).toMatch(/nothing separates the players/i);
+    expect(answerText).toMatch(blockingSentence);
+    for (const player of PLAYERS) expect(answerText).not.toContain(player.name);
   });
 
   it("says the Course has no known Fit Trait, not that the Players lack a record, when none is known", () => {
@@ -138,6 +166,9 @@ describe("Ranking", () => {
     expect(within(section).getByText(noTraitSentence)).toBeTruthy();
     expect(section.textContent).not.toMatch(/no usable record|no record/i);
     expect(section.textContent).not.toMatch(/enough results|results to state/i);
+    const answerText = answer().textContent ?? "";
+    expect(answerText).toMatch(noTraitSentence);
+    for (const player of PLAYERS) expect(answerText).not.toContain(player.name);
   });
 
   it("does not blame a known Trait's range when a different known Trait is merely zero-weighted", () => {
@@ -192,5 +223,44 @@ describe("Ranking", () => {
     for (const player of PLAYERS) {
       expect(within(section).getByText(new RegExp(player.name))).toBeTruthy();
     }
+    const answerText = answer().textContent ?? "";
+    expect(answerText).toMatch(/nothing separates the players/i);
+    expect(answerText).toMatch(weightingsSentence);
+    for (const player of PLAYERS) expect(answerText).not.toContain(player.name);
+  });
+
+  it("says no Player has enough results, naming no Player, when every Player is unscored for their record", () => {
+    // Every Player here has every Strength null, but the Course asks something on the
+    // declared Weightings, so this is reason 3 (the record), with nobody scored at all.
+    const noRecordPlayers: typeof PLAYERS = PLAYERS.map((p) => ({
+      ...p,
+      skill: p.skill ? { ...p.skill, value: null } : null,
+      consistency: p.consistency ? { ...p.consistency, value: null } : null,
+      lowRounds: p.lowRounds ? { ...p.lowRounds, value: null } : null,
+    }));
+    render(
+      <Ranking
+        players={noRecordPlayers}
+        traits={fitTraits(TRUSTED_TRAITS)}
+        hasVenue={false}
+      />,
+    );
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(
+      within(rankingSection()).getByText(
+        /No Player has a Fit Score: no Player has enough results for a Strength this Course asks for\./,
+      ),
+    ).toBeTruthy();
+    const noRecord = noRecordSection();
+    for (const player of PLAYERS) {
+      expect(within(noRecord).getByText(new RegExp(player.name))).toBeTruthy();
+    }
+    const answerText = answer().textContent ?? "";
+    expect(answerText).toMatch(/nothing separates the players/i);
+    expect(answerText).toMatch(
+      /no player has enough results for a strength this course asks for/i,
+    );
+    for (const player of PLAYERS) expect(answerText).not.toContain(player.name);
   });
 });
