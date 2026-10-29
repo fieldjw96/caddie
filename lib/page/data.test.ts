@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { courseProfile, coverageSentences, fitTraits, formatDates, matchCourse } from "./data";
+import {
+  classifyCoverageEditions,
+  courseProfile,
+  coverageSentences,
+  fitTraits,
+  formatDates,
+  matchCourse,
+} from "./data";
 import {
   TRUSTED_COURSE,
   TRUSTED_TRAITS,
@@ -152,11 +159,14 @@ describe("coverageSentences", () => {
   it("names the events covered, apart by table, and says regular events are not", () => {
     const text = coverageSentences({
       seasons: [2025],
-      leaderboardEvents: ["Masters Tournament", "The Open Championship"],
-      standingsEvents: ["Genesis Invitational"],
+      leaderboardEvents: [
+        { name: "Masters Tournament", season: 2025 },
+        { name: "The Open Championship", season: 2025 },
+      ],
+      standingsEvents: [{ name: "Genesis Invitational", season: 2025 }],
     }).join(" ");
     expect(text).toContain("The record covers 3 events from the 2025 season.");
-    expect(text).toContain("Masters Tournament and The Open Championship");
+    expect(text).toContain("Masters Tournament (2025) and The Open Championship (2025)");
     expect(text).toContain("top 30 of the FedEx Cup standings");
     expect(text).toContain(
       "Regular tour events are not covered, because no source we can publish from carries their results.",
@@ -167,6 +177,33 @@ describe("coverageSentences", () => {
     expect(
       coverageSentences({ seasons: [], leaderboardEvents: [], standingsEvents: [] })[0],
     ).toMatch(/No results are stored yet/);
+  });
+});
+
+describe("classifyCoverageEditions", () => {
+  it("classifies each (name, season) edition from its own rows only", () => {
+    const { leaderboardEvents, standingsEvents } = classifyCoverageEditions([
+      { name: "Masters Tournament", season: 2025, basis: "leaderboard" },
+      { name: "Masters Tournament", season: 2025, basis: "standings" },
+      { name: "Masters Tournament", season: 2026, basis: "standings" },
+    ]);
+    expect(leaderboardEvents).toEqual([{ name: "Masters Tournament", season: 2025 }]);
+    expect(standingsEvents).toEqual([{ name: "Masters Tournament", season: 2026 }]);
+
+    const total = leaderboardEvents.length + standingsEvents.length;
+    expect(total).toBe(2);
+
+    const text = coverageSentences({
+      seasons: [2025, 2026],
+      leaderboardEvents,
+      standingsEvents,
+    }).join(" ");
+    expect(text).toContain("2025");
+    expect(text).toContain("2026");
+    const leaderboardSentence = text
+      .split(". ")
+      .find((s) => s.startsWith("Full-field leaderboards"));
+    expect(leaderboardSentence).not.toContain("2026");
   });
 });
 

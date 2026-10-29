@@ -67,13 +67,55 @@ export interface CourseView {
 /** One stored Course Trait, by name. */
 export type StoredTraits = Readonly<Record<string, { value: number; unit: string }>>;
 
-/** Which events the stored record covers, and from which kind of table. */
+/** One Tournament edition: a name alone spans seasons, so the pair is the unit the record counts. */
+export interface CoverageEvent {
+  name: string;
+  season: number;
+}
+
+/** Which editions the stored record covers, and from which kind of table. */
 export interface CoverageView {
   seasons: number[];
-  /** Events with a full-field leaderboard. */
-  leaderboardEvents: string[];
-  /** Events read only from the FedEx Cup standings' top 30 or the playoffs' qualifiers. */
-  standingsEvents: string[];
+  /** Editions with a full-field leaderboard. */
+  leaderboardEvents: CoverageEvent[];
+  /** Editions read only from the FedEx Cup standings' top 30 or the playoffs' qualifiers. */
+  standingsEvents: CoverageEvent[];
+}
+
+/** One stored result row's edition and the table it was read from, grouped by `lib/page/load.ts`. */
+export interface CoverageEditionRow {
+  name: string;
+  season: number;
+  basis: "leaderboard" | "standings";
+}
+
+/**
+ * Classifies each (name, season) edition from its own rows only: an edition with any
+ * `leaderboard` row is a leaderboard edition, even when another season's edition of the same
+ * Tournament was read only from standings. Order follows first appearance in `rows`, which
+ * `lib/page/load.ts` sorts by start date.
+ */
+export function classifyCoverageEditions(rows: readonly CoverageEditionRow[]): {
+  leaderboardEvents: CoverageEvent[];
+  standingsEvents: CoverageEvent[];
+} {
+  const key = (r: { name: string; season: number }) => `${r.name}\u0000${r.season}`;
+  const leaderboardKeys = new Set(rows.filter((r) => r.basis === "leaderboard").map(key));
+  const leaderboardEvents: CoverageEvent[] = [];
+  const standingsEvents: CoverageEvent[] = [];
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const k = key(r);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const event: CoverageEvent = { name: r.name, season: r.season };
+    if (leaderboardKeys.has(k)) {
+      leaderboardEvents.push(event);
+    } else {
+      standingsEvents.push(event);
+    }
+  }
+  return { leaderboardEvents, standingsEvents };
 }
 
 export interface PageData {
@@ -336,14 +378,16 @@ export function coverageSentences(coverage: CoverageView): string[] {
       ? ""
       : ` from the ${listInWords(seasons.map(String))} season${seasons.length > 1 ? "s" : ""}`;
   const sentences = [`The record covers ${total} event${total === 1 ? "" : "s"}${season}.`];
+  const named = (events: readonly CoverageEvent[]) =>
+    listInWords(events.map((e) => `${e.name} (${e.season})`));
   if (leaderboardEvents.length > 0) {
     sentences.push(
-      `Full-field leaderboards, every Player who teed off: ${listInWords(leaderboardEvents)}.`,
+      `Full-field leaderboards, every Player who teed off: ${named(leaderboardEvents)}.`,
     );
   }
   if (standingsEvents.length > 0) {
     sentences.push(
-      `Finishes only, from tables that list only Players who had a good season, the top 30 of the FedEx Cup standings or a playoff event's qualifiers: ${listInWords(standingsEvents)}.`,
+      `Finishes only, from tables that list only Players who had a good season, the top 30 of the FedEx Cup standings or a playoff event's qualifiers: ${named(standingsEvents)}.`,
     );
   }
   sentences.push(
