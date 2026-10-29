@@ -37,6 +37,8 @@ const DATA: PageData = {
     leaderboardEvents: [{ name: "Masters Tournament", season: 2026 }],
     standingsEvents: [],
   },
+  strengthsDerivedAt: "2026-09-21T06:17:00Z",
+  resultsReadAt: "2026-09-21T06:17:00Z",
 };
 
 const page = (data: PageData | null) =>

@@ -6,6 +6,7 @@ import { PageView } from "./page-view";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const data = await loadPageData(new Date());
-  return <PageView data={data} />;
+  const now = new Date();
+  const data = await loadPageData(now);
+  return <PageView data={data} now={now} />;
 }

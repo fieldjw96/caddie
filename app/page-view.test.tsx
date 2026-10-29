@@ -14,6 +14,9 @@ import {
 } from "../lib/page/fixtures";
 import { LICENCES, PageView } from "./page-view";
 
+// Fixed so the freshness tests below do not depend on when they happen to run.
+const NOW = new Date("2026-10-28T12:00:00Z");
+
 const DATA: PageData = {
   tournament: {
     name: "Arnold Palmer Invitational",
@@ -31,6 +34,8 @@ const DATA: PageData = {
     leaderboardEvents: [{ name: "Masters Tournament", season: 2026 }],
     standingsEvents: [{ name: "Genesis Invitational", season: 2026 }],
   },
+  strengthsDerivedAt: "2026-10-27T06:17:00Z",
+  resultsReadAt: "2026-10-27T06:17:00Z",
 };
 
 const UNTRUSTED: PageData = { ...DATA, course: UNTRUSTED_COURSE, traits: UNTRUSTED_TRAITS };
@@ -50,11 +55,12 @@ const FROM_ARTICLE: PageData = {
   traits: ARTICLE_TRAITS,
 };
 
-const html = (data: PageData | null) => renderToString(<PageView data={data} />);
+const html = (data: PageData | null, now: Date = NOW) =>
+  renderToString(<PageView data={data} now={now} />);
 
 /** The HTML's text, roughly as a reader sees it. */
-const text = (data: PageData | null) =>
-  html(data)
+const text = (data: PageData | null, now: Date = NOW) =>
+  html(data, now)
     .replace(/<[^>]+>/g, " ")
     .replace(/&#x27;|&rsquo;|’/g, "'")
     .replace(/<!-- -->/g, "")
@@ -179,6 +185,33 @@ describe("PageView, rendered on the server", () => {
     const t = text(data);
     expect(t).not.toContain("Record here");
     expect(h).not.toMatch(/<th[^>]*>\s*Record here\s*<\/th>/);
+  });
+
+  it("states when Strengths were derived and results last read, in the header", () => {
+    const t = text(DATA);
+    expect(t).toContain("Strengths derived 27 Oct 2026");
+    expect(t).toContain("results last read 27 Oct 2026");
+  });
+
+  it("does not flag Strengths as stale within two days of the derive", () => {
+    const t = text(DATA);
+    expect(t).not.toContain("How fresh this is");
+  });
+
+  it("flags Strengths as stale more than two days after the derive", () => {
+    const stale: PageData = { ...DATA, strengthsDerivedAt: "2026-10-20T06:17:00Z" };
+    const t = text(stale);
+    expect(t).toContain("How fresh this is");
+    expect(t).toContain("20 Oct 2026");
+  });
+
+  it("reads a never-derived Strength as stale, with 'never' wording, and does not throw", () => {
+    const never: PageData = { ...DATA, strengthsDerivedAt: null, resultsReadAt: null };
+    expect(() => text(never)).not.toThrow();
+    const t = text(never);
+    expect(t).toContain("How fresh this is");
+    expect(t).toContain("Strengths derived never");
+    expect(t).toContain("results last read never");
   });
 
   it("shows the Record here column when at least one Player has a venue record value", () => {
