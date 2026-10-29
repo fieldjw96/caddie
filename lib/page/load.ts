@@ -20,7 +20,13 @@ import {
 import { selectRoster } from "../roster";
 import { nextTournament } from "../schedule/next-tournament";
 import { strengthKey } from "../strengths/store";
-import { matchCourse, type CourseView, type PageData, type StrengthView } from "./data";
+import {
+  classifyCoverageEditions,
+  matchCourse,
+  type CourseView,
+  type PageData,
+  type StrengthView,
+} from "./data";
 
 function championshipTee(tees: CourseTee[] | null, published: number | null) {
   if (!tees || published === null) return null;
@@ -107,20 +113,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
     .groupBy(tournaments.name, tournaments.season, tournaments.startDate, results.basis)
     .orderBy(tournaments.startDate);
 
-  // An event with any leaderboard row is a leaderboard event: the standings rows of it, where
-  // the leaderboard was preferred, are the same finishes read from a worse table.
-  const leaderboard = new Set(
-    coverageRows.filter((r) => r.basis === "leaderboard").map((r) => r.name),
-  );
-  const eventNames = (basis: "leaderboard" | "standings") => [
-    ...new Set(
-      coverageRows
-        .filter((r) =>
-          basis === "leaderboard" ? leaderboard.has(r.name) : !leaderboard.has(r.name),
-        )
-        .map((r) => r.name),
-    ),
-  ];
+  const { leaderboardEvents, standingsEvents } = classifyCoverageEditions(coverageRows);
 
   const course: CourseView | null =
     courseRow === null
@@ -171,8 +164,8 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
       })),
     coverage: {
       seasons: [...new Set(coverageRows.map((r) => r.season))].sort((a, b) => a - b),
-      leaderboardEvents: eventNames("leaderboard"),
-      standingsEvents: eventNames("standings"),
+      leaderboardEvents,
+      standingsEvents,
     },
   };
 }

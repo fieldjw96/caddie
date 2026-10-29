@@ -28,8 +28,8 @@ const DATA: PageData = {
   players: PLAYERS,
   coverage: {
     seasons: [2026],
-    leaderboardEvents: ["Masters Tournament"],
-    standingsEvents: ["Genesis Invitational"],
+    leaderboardEvents: [{ name: "Masters Tournament", season: 2026 }],
+    standingsEvents: [{ name: "Genesis Invitational", season: 2026 }],
   },
 };
 
