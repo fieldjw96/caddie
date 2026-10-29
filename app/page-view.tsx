@@ -201,9 +201,9 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
           </li>
           {isStale(data.strengthsDerivedAt, now) && (
             <li>
-              <strong>How fresh this is.</strong> The daily ingest keeps the Strengths and
-              results below current; this time it has not. Strengths were last derived{" "}
-              {formatFreshnessDate(data.strengthsDerivedAt)} and may not reflect results since.
+              <strong>How fresh this is.</strong> Strengths were last derived{" "}
+              {formatFreshnessDate(data.strengthsDerivedAt)} and may not reflect results since:
+              the daily ingest that keeps them current has missed its run.
             </li>
           )}
           {!holesTrusted && (
