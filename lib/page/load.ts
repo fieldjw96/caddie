@@ -7,7 +7,7 @@
 // routes, when no database is there to talk to.
 
 import "server-only";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, max } from "drizzle-orm";
 import {
   courses,
   courseTraits,
@@ -77,22 +77,29 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
     "form",
     ...(venueKey === null ? [] : [venueKey]),
   ];
-  const [playerRows, strengthRows, rosterResultRows] = await Promise.all([
-    db.select({ id: players.id, name: players.name, country: players.country }).from(players),
-    db
-      .select({
-        playerId: playerStrengths.playerId,
-        strength: playerStrengths.strength,
-        value: playerStrengths.value,
-        sampleSize: playerStrengths.sampleSize,
-      })
-      .from(playerStrengths)
-      .where(inArray(playerStrengths.strength, keys)),
-    db
-      .select({ playerId: results.playerId, endDate: tournaments.endDate })
-      .from(results)
-      .innerJoin(tournaments, eq(results.tournamentId, tournaments.id)),
-  ]);
+  const [playerRows, strengthRows, rosterResultRows, strengthsDerivedRows, resultsReadRows] =
+    await Promise.all([
+      db
+        .select({ id: players.id, name: players.name, country: players.country })
+        .from(players),
+      db
+        .select({
+          playerId: playerStrengths.playerId,
+          strength: playerStrengths.strength,
+          value: playerStrengths.value,
+          sampleSize: playerStrengths.sampleSize,
+        })
+        .from(playerStrengths)
+        .where(inArray(playerStrengths.strength, keys)),
+      db
+        .select({ playerId: results.playerId, endDate: tournaments.endDate })
+        .from(results)
+        .innerJoin(tournaments, eq(results.tournamentId, tournaments.id)),
+      db.select({ recordedAt: max(playerStrengths.recordedAt) }).from(playerStrengths),
+      db.select({ recordedAt: max(results.recordedAt) }).from(results),
+    ]);
+  const strengthsDerivedAt = strengthsDerivedRows[0]?.recordedAt?.toISOString() ?? null;
+  const resultsReadAt = resultsReadRows[0]?.recordedAt?.toISOString() ?? null;
 
   const strengths = new Map<string, StrengthView>();
   for (const s of strengthRows) {
@@ -167,5 +174,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
       leaderboardEvents,
       standingsEvents,
     },
+    strengthsDerivedAt,
+    resultsReadAt,
   };
 }

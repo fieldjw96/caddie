@@ -124,6 +124,10 @@ export interface PageData {
   traits: StoredTraits;
   players: PlayerView[];
   coverage: CoverageView;
+  /** The newest `player_strengths.recorded_at`, as an ISO timestamp, or null when the table is empty. */
+  strengthsDerivedAt: string | null;
+  /** The newest `results.recorded_at`, as an ISO timestamp, or null when the table is empty. */
+  resultsReadAt: string | null;
 }
 
 /**
@@ -338,6 +342,29 @@ export function courseProfile(course: CourseView | null, traits: StoredTraits): 
 
   if (course?.architect) lines.push({ label: "Architect", value: course.architect });
   return lines;
+}
+
+/**
+ * The daily ingest (`.github/workflows/ingest.yml`) runs once at 06:17 UTC. Two days lets one
+ * missed run pass without the page crying wolf; a `derivedAt` of `null` — no Strength has ever
+ * been derived — is stale however recent `now` is.
+ */
+const STALE_AFTER_MS = 2 * 24 * 60 * 60 * 1000;
+
+/** Whether the newest Strengths derive is too old to trust Form's 180-day window. */
+export function isStale(derivedAt: string | null, now: Date): boolean {
+  if (derivedAt === null) return true;
+  return now.getTime() - new Date(derivedAt).getTime() > STALE_AFTER_MS;
+}
+
+/** "28 Oct 2026" in UTC, or "never" for a table that has no row yet. */
+export function formatFreshnessDate(iso: string | null): string {
+  if (iso === null) return "never";
+  const d = new Date(iso);
+  const day = d.getUTCDate();
+  const month = d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" });
+  const year = d.getUTCFullYear();
+  return `${day} ${month} ${year}`;
 }
 
 /** "18–21 September 2026", or across a month where the Tournament spans one. */

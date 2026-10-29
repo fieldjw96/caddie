@@ -7,7 +7,9 @@ import {
   coverageSentences,
   fitTraits,
   formatDates,
+  formatFreshnessDate,
   holesUnavailableReason,
+  isStale,
   type PageData,
 } from "../lib/page/data";
 import { ROSTER_WINDOW_MONTHS } from "../lib/roster";
@@ -108,7 +110,7 @@ function Attribution({ data }: { data: PageData | null }) {
   );
 }
 
-export function PageView({ data }: { data: PageData | null }) {
+export function PageView({ data, now = new Date() }: { data: PageData | null; now?: Date }) {
   if (data === null) {
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
@@ -144,6 +146,10 @@ export function PageView({ data }: { data: PageData | null }) {
           <strong>The field is assumed, not confirmed.</strong> No open source publishes entry
           lists, so this ranks Players with a stored result in the last {ROSTER_WINDOW_MONTHS}{" "}
           months, {players.length} Players, rather than the Players actually entered this week.
+        </p>
+        <p className="mt-2 text-sm text-muted">
+          Strengths derived {formatFreshnessDate(data.strengthsDerivedAt)}, from results last
+          read {formatFreshnessDate(data.resultsReadAt)}.
         </p>
       </header>
 
@@ -193,6 +199,13 @@ export function PageView({ data }: { data: PageData | null }) {
           <li>
             <strong>Most results.</strong> {coverageSentences(coverage).join(" ")}
           </li>
+          {isStale(data.strengthsDerivedAt, now) && (
+            <li>
+              <strong>How fresh this is.</strong> The daily ingest keeps the Strengths and
+              results below current; this time it has not. Strengths were last derived{" "}
+              {formatFreshnessDate(data.strengthsDerivedAt)} and may not reflect results since.
+            </li>
+          )}
           {!holesTrusted && (
             <li>
               <strong>Some of the Course.</strong> {holesUnavailableReason(course)}

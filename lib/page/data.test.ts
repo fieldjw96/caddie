@@ -5,6 +5,8 @@ import {
   coverageSentences,
   fitTraits,
   formatDates,
+  formatFreshnessDate,
+  isStale,
   matchCourse,
 } from "./data";
 import {
@@ -211,5 +213,32 @@ describe("formatDates", () => {
   it("reads a week in one month, and one across two", () => {
     expect(formatDates("2026-09-24", "2026-09-27")).toBe("24–27 September 2026");
     expect(formatDates("2026-09-30", "2026-10-03")).toBe("30 September – 3 October 2026");
+  });
+});
+
+describe("isStale", () => {
+  const now = new Date("2026-10-28T06:17:00Z");
+
+  it("is not stale one day after the derive", () => {
+    expect(isStale("2026-10-27T06:17:00Z", now)).toBe(false);
+  });
+
+  it("is not stale exactly two days after the derive", () => {
+    expect(isStale("2026-10-26T06:17:00Z", now)).toBe(false);
+  });
+
+  it("is stale two days and one minute after the derive", () => {
+    expect(isStale("2026-10-26T06:16:00Z", now)).toBe(true);
+  });
+
+  it("reads null as stale, and never throws", () => {
+    expect(isStale(null, now)).toBe(true);
+    expect(formatFreshnessDate(null)).toBe("never");
+  });
+});
+
+describe("formatFreshnessDate", () => {
+  it("states the calendar date in UTC", () => {
+    expect(formatFreshnessDate("2026-10-28T06:17:00Z")).toBe("28 Oct 2026");
   });
 });
