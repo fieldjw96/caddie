@@ -61,7 +61,9 @@ from a guess.
 **Source**:
 Where one fact came from, and the licence it arrived under. Every stored fact carries its
 Source. This is load-bearing rather than tidy: this product exists on openly-licensed data
-only, and a fact whose Source is unknown cannot be shown. See `docs/adr/0001`.
+only, and a fact whose Source is unknown cannot be shown. See `docs/adr/0001`. The one recorded
+exception is a card declared by hand, whose Source is `declared` and which the page marks as not
+openly licensed. See `docs/adr/0005`.
 _Avoid_: origin, feed, provider
 
 **Derived**:

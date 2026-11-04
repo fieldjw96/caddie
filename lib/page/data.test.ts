@@ -137,6 +137,21 @@ describe("courseProfile", () => {
     expect(altitude?.value).toBe("about 174 feet above sea level");
   });
 
+  it("names the hand-entered card, not OpenGolfAPI, when that card fails its check", () => {
+    const declared = {
+      ...UNTRUSTED_COURSE,
+      source: "wikipedia" as const,
+      holesSource: "declared" as const,
+      holesSourceUrl: "https://example.com/card",
+    };
+    const reason = holesUnavailableReason(declared);
+    expect(reason).toContain("The hand-entered card's");
+    expect(reason).not.toContain("OpenGolfAPI");
+    expect(holesUnavailableReason({ ...declared, holesTrusted: null })).toContain(
+      "hand-entered card could not be checked",
+    );
+  });
+
   it("does not blame the Wikipedia article for a Course with holes from elsewhere", () => {
     const osm = {
       ...TRUSTED_COURSE,

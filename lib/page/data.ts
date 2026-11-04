@@ -193,6 +193,8 @@ export function holesUnavailableReason(course: CourseView | null): string {
   if (course.source === "wikipedia" && course.holesSource === null) {
     return "Not shown: this Course comes from the Tournament's own Wikipedia article, which states a published total rather than a hole-by-hole card.";
   }
+  const whose =
+    course.holesSource === "declared" ? "The hand-entered card's" : "OpenGolfAPI's";
   if (course.holesTrusted === false) {
     const sum = course.holesYardageSum;
     const published = course.publishedYardage;
@@ -200,12 +202,15 @@ export function holesUnavailableReason(course: CourseView | null): string {
     if (sum !== null && published !== null && difference !== null) {
       const direction = difference < 0 ? "short of" : "over";
       return (
-        `Not shown: OpenGolfAPI's hole-by-hole yardages${course.holesCheckedTee ? ` from the ${course.holesCheckedTee} tees` : ""} ` +
+        `Not shown: ${whose} hole-by-hole yardages${course.holesCheckedTee ? ` from the ${course.holesCheckedTee} tees` : ""} ` +
         `add up to ${yards(sum)}, ${yards(Math.abs(difference))} ${direction} the published ` +
         `${yards(published)}, so every Trait built on the holes is refused.`
       );
     }
-    return "Not shown: OpenGolfAPI's hole-by-hole yardages disagree with the published total, so every Trait built on the holes is refused.";
+    return `Not shown: ${whose} hole-by-hole yardages disagree with the published total, so every Trait built on the holes is refused.`;
+  }
+  if (course.holesTrusted === null && course.holesSource === "declared") {
+    return "Not shown: the hand-entered card could not be checked, because no published total is stored for this Course.";
   }
   if (course.holesTrusted === null) {
     return "Not shown: OpenGolfAPI gave no hole-by-hole data that could be checked against the published total.";
