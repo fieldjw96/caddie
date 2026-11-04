@@ -24,7 +24,15 @@ const tables: PgTable[] = [
 
 describe("source", () => {
   it("is exactly the three Sources and derived", () => {
-    expect(source.enumValues).toEqual(["wikidata", "wikipedia", "opengolfapi", "derived"]);
+    expect(source.enumValues).toEqual([
+      "wikidata",
+      "wikipedia",
+      "opengolfapi",
+      "derived",
+      "openstreetmap",
+      "copernicus",
+      "declared",
+    ]);
   });
 });
 

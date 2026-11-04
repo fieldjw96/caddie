@@ -48,6 +48,15 @@ and exits non-zero. Idempotent, and about 100 of the 500 requests a day:
 
     npm run ingest:courses
 
+Cards and altitude, for the Courses that leaves short. A Course with no holes of its own gets
+its pars from `data/osm-course-holes.json`, or a card declared in `lib/courses/cards.ts`, and any
+Course with coordinates and no altitude gets one from the Copernicus elevation model. See ADR 0005.
+The snapshot is refreshed by hand, with `npm run snapshot:osm-courses`, and is not part of the
+daily run:
+
+    npm run ingest:course-cards
+    npm run ingest:course-altitude
+
 Altitude and green surface, from each Course's own Wikipedia article, added onto its
 `courses` row. Neither is reliably published: a Course whose article cannot be found, or whose
 infobox states neither field, is reported rather than treated as an error. Idempotent, and

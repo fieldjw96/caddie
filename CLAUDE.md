@@ -25,8 +25,9 @@ Postgres through Drizzle. Recharts for every chart. Zod at every external bounda
 
 ## Rules
 
-**Only openly-licensed data, and this is the rule that shapes everything.** Wikidata, Wikipedia
-and OpenGolfAPI are in. pgatour.com, ESPN and CBS are prohibited by their own terms and must
+**Only openly-licensed data, and this is the rule that shapes everything.** Wikidata, Wikipedia,
+OpenGolfAPI, OpenStreetMap and the Copernicus elevation model are in. El Cardonal's hand-entered
+card is the one recorded exception, and ADR 0005 says why it is not a precedent. pgatour.com, ESPN and CBS are prohibited by their own terms and must
 never be fetched, not even once, not even in a test fixture. DataGolf is licensed for personal
 use only and may not be republished. See ADR 0001. Adding a Source needs an ADR amending it.
 

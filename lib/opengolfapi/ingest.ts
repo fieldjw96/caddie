@@ -47,6 +47,7 @@ export function toCourseRow(course: CourseResponse, attribution: string): Course
       yardages: h.yardages ?? {},
     })) ?? null;
   const check = checkHoles(holes, tees, course.yardage);
+  const located = typeof course.lat === "number" && typeof course.lng === "number";
 
   return {
     name: course.course_name,
@@ -56,11 +57,17 @@ export function toCourseRow(course: CourseResponse, attribution: string): Course
     architect: course.architect,
     tees,
     holes,
+    holesSource: null,
+    holesSourceUrl: null,
     holesCheckedTee: check?.tee ?? null,
     holesYardageSum: check?.sum ?? null,
     holesYardageDifference: check?.difference ?? null,
     holesTrusted: check?.trusted ?? null,
     attribution,
+    latitude: located ? course.lat : null,
+    longitude: located ? course.lng : null,
+    coordinatesSource: located ? "opengolfapi" : null,
+    coordinatesSourceUrl: located ? sourceUrl(course.id) : null,
     source: "opengolfapi",
     sourceUrl: sourceUrl(course.id),
     derivation: null,

@@ -119,6 +119,10 @@ jobs:
         run: npx tsx scripts/ingest-stage.ts courses
       - name: "Stage: course facts"
         run: npx tsx scripts/ingest-stage.ts course facts
+      - name: "Stage: course cards"
+        run: npx tsx scripts/ingest-stage.ts course cards
+      - name: "Stage: course altitude"
+        run: npx tsx scripts/ingest-stage.ts course altitude
       - name: "Stage: results"
         run: npx tsx scripts/ingest-stage.ts results
       - name: "Stage: course traits"

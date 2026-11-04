@@ -23,11 +23,20 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * Where one fact came from. Three Sources we have the right to publish, and `derived` for
- * anything this repo computed itself. That is the whole vocabulary: adding a value here is
- * adding a Source, which needs an ADR amending 0001.
+ * Where one fact came from: the Sources we have the right to publish, `derived` for anything
+ * this repo computed itself, and `declared` for a fact a person entered by hand, which is the
+ * one value here that is not an open Source and which ADR 0005 limits to named Courses. That is
+ * the whole vocabulary: adding a value here is adding a Source, which needs an ADR amending 0001.
  */
-export const source = pgEnum("source", ["wikidata", "wikipedia", "opengolfapi", "derived"]);
+export const source = pgEnum("source", [
+  "wikidata",
+  "wikipedia",
+  "opengolfapi",
+  "derived",
+  "openstreetmap",
+  "copernicus",
+  "declared",
+]);
 
 export type Source = (typeof source.enumValues)[number];
 
@@ -140,6 +149,13 @@ export const courses = pgTable(
     tees: jsonb("tees").$type<CourseTee[]>(),
     /** Hole-by-hole par and yardage exactly as fetched, trusted or not. */
     holes: jsonb("holes").$type<CourseHole[]>(),
+    /**
+     * Where `holes` came from when that is not the row's own Source: a card from OpenStreetMap
+     * or one declared by hand, for a Course OpenGolfAPI has no holes for. Null when the holes
+     * are the row's own, or there are none. See ADR 0005.
+     */
+    holesSource: source("holes_source"),
+    holesSourceUrl: text("holes_source_url"),
     /** Which of the holes' yardage keys was summed for the check. */
     holesCheckedTee: text("holes_checked_tee"),
     holesYardageSum: integer("holes_yardage_sum"),
@@ -149,17 +165,18 @@ export const courses = pgTable(
     /** The attribution the Source's licence requires, ready for a page to print as it is. */
     attribution: text("attribution"),
     /**
-     * Feet above sea level, from the Course's own Wikipedia article. Wikipedia states this in
-     * feet, in metres, or as both via `{{convert}}`; a metric reading is converted to feet
+     * Feet above sea level, from the Course's own Wikipedia article, or failing that read off
+     * the Copernicus elevation model at the Course's coordinates. Wikipedia states this in feet,
+     * in metres, or as both via `{{convert}}`; a metric reading is converted to feet
      * (1 m = 3.28084 ft, rounded to the nearest foot) before it is stored, so every row is in
-     * the same unit. Null means that article does not state it, which is most of them.
+     * the same unit. Null means neither has given one.
      */
     altitude: integer("altitude"),
     /**
      * The whole row's `source`/`source_url` are OpenGolfAPI's, so altitude carries its own:
-     * always Wikipedia, always the revision it was read at. Null exactly when `altitude` is.
-     * `altitude_source` is a real Source value, not a comment's word for it: the database
-     * enforces `wikipedia` the same way it enforces every other per-fact Source in this schema.
+     * the Wikipedia revision it was read at, or the elevation request that read it. Null exactly
+     * when `altitude` is. `altitude_source` is a real Source value, not a comment's word for it:
+     * the database enforces which ones, as it does every other per-fact Source in this schema.
      */
     altitudeSource: source("altitude_source"),
     altitudeSourceUrl: text("altitude_source_url"),
@@ -172,6 +189,11 @@ export const courses = pgTable(
     /** Same idea as `altitude_source`/`altitude_source_url`: Wikipedia's, independent of the row's own Source. */
     greenSurfaceSource: source("green_surface_source"),
     greenSurfaceSourceUrl: text("green_surface_source_url"),
+    /** Where the Course is, which is what the elevation model is read at. Never displayed. */
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    coordinatesSource: source("coordinates_source"),
+    coordinatesSourceUrl: text("coordinates_source_url"),
     ...provenance,
   },
   (t) => [
@@ -191,20 +213,32 @@ export const courses = pgTable(
       "courses_opengolfapi_is_attributed",
       sql`${t.source} <> 'opengolfapi' or (${t.attribution} is not null and btrim(${t.attribution}) <> '')`,
     ),
-    // Altitude and green surface each carry their own Source, because they come from
-    // Wikipedia whatever the row's own `source` is. Absent means absent: no default, no sea
-    // level, no "bentgrass probably", and never a value with nowhere it came from. Both are
-    // read from Wikipedia alone, so `_source` is pinned to that enum value rather than left
-    // to a comment's word for it.
+    // Altitude and green surface each carry their own Source, because neither comes from the
+    // row's own `source`. Absent means absent: no default, no sea level, no "bentgrass
+    // probably", and never a value with nowhere it came from. `_source` is pinned to the Sources
+    // each may come from rather than left to a comment's word for it. The `::text` is not
+    // decoration: drizzle migrates in one transaction, and Postgres refuses a newly added enum
+    // value as an enum literal until the transaction that added it has committed.
     check(
       "courses_altitude_source_is_recorded",
       sql`(${t.altitude} is null and ${t.altitudeSource} is null and ${t.altitudeSourceUrl} is null)
-        or (${t.altitude} is not null and ${t.altitudeSource} is not null and ${t.altitudeSource} = 'wikipedia' and ${t.altitudeSourceUrl} is not null and btrim(${t.altitudeSourceUrl}) <> '')`,
+        or (${t.altitude} is not null and ${t.altitudeSource} is not null and ${t.altitudeSource}::text in ('wikipedia', 'copernicus') and ${t.altitudeSourceUrl} is not null and btrim(${t.altitudeSourceUrl}) <> '')`,
     ),
     check(
       "courses_green_surface_source_is_recorded",
       sql`(${t.greenSurface} is null and ${t.greenSurfaceSource} is null and ${t.greenSurfaceSourceUrl} is null)
         or (${t.greenSurface} is not null and btrim(${t.greenSurface}) <> '' and ${t.greenSurfaceSource} is not null and ${t.greenSurfaceSource} = 'wikipedia' and ${t.greenSurfaceSourceUrl} is not null and btrim(${t.greenSurfaceSourceUrl}) <> '')`,
+    ),
+    // Holes from elsewhere name where, and only these two Sources may supply them that way.
+    check(
+      "courses_holes_source_is_recorded",
+      sql`(${t.holesSource} is null and ${t.holesSourceUrl} is null)
+        or (${t.holes} is not null and ${t.holesSource} is not null and ${t.holesSource}::text in ('openstreetmap', 'declared') and ${t.holesSourceUrl} is not null and btrim(${t.holesSourceUrl}) <> '')`,
+    ),
+    check(
+      "courses_coordinates_source_is_recorded",
+      sql`(${t.latitude} is null and ${t.longitude} is null and ${t.coordinatesSource} is null and ${t.coordinatesSourceUrl} is null)
+        or (${t.latitude} between -90 and 90 and ${t.longitude} between -180 and 180 and ${t.coordinatesSource} is not null and ${t.coordinatesSource}::text in ('opengolfapi', 'openstreetmap') and ${t.coordinatesSourceUrl} is not null and btrim(${t.coordinatesSourceUrl}) <> '')`,
     ),
     // A verdict with its working, or no verdict: `holes_trusted` never stands alone.
     check(

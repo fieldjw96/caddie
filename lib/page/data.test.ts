@@ -8,6 +8,8 @@ import {
   formatFreshnessDate,
   isStale,
   matchCourse,
+  holesUnavailableReason,
+  parUnavailableReason,
 } from "./data";
 import {
   TRUSTED_COURSE,
@@ -127,6 +129,24 @@ describe("courseProfile", () => {
     expect(greenSurface && "reason" in greenSurface ? greenSurface.reason : "").toContain(
       "no Source we hold has stored this Course's green surface",
     );
+  });
+
+  it("says about for an altitude read off the elevation model", () => {
+    const course = { ...TRUSTED_COURSE, altitude: 174, altitudeSource: "copernicus" as const };
+    const altitude = courseProfile(course, TRUSTED_TRAITS).find((l) => l.label === "Altitude");
+    expect(altitude?.value).toBe("about 174 feet above sea level");
+  });
+
+  it("does not blame the Wikipedia article for a Course with holes from elsewhere", () => {
+    const osm = {
+      ...TRUSTED_COURSE,
+      source: "wikipedia" as const,
+      holesSource: "openstreetmap" as const,
+      holesSourceUrl: "https://www.openstreetmap.org/way/1",
+      holesTrusted: null,
+    };
+    expect(holesUnavailableReason(osm)).toContain("no card yardages");
+    expect(parUnavailableReason(osm)).toContain("fails the par check");
   });
 
   it("shows the raw length alone when no altitude-adjusted length is stored", () => {

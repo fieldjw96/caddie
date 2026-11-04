@@ -125,6 +125,85 @@ describe("storeCourseFacts", () => {
   });
 });
 
+describe("an altitude from the elevation model", () => {
+  const model = {
+    altitude: 174,
+    altitudeSource: "copernicus" as const,
+    altitudeSourceUrl: "https://api.open-meteo.com/v1/elevation?latitude=1&longitude=2",
+  };
+  const read = (id: number, altitudeFeet: number | null): CourseFactsOutcome => ({
+    status: "read",
+    courseId: id,
+    name: "Test Course",
+    altitudeFeet,
+    greenSurface: null,
+    sourceUrl: "https://en.wikipedia.org/w/index.php?title=Test_Course&oldid=9",
+  });
+
+  it("survives an article that states no altitude", async () => {
+    const id = await makeCourse();
+    await db.update(courses).set(model).where(eq(courses.id, id));
+
+    await storeCourseFacts(db, read(id, null));
+
+    const [stored] = await db.select().from(courses).where(eq(courses.id, id));
+    expect(stored).toMatchObject(model);
+  });
+
+  it("gives way to an article that states one", async () => {
+    const id = await makeCourse();
+    await db.update(courses).set(model).where(eq(courses.id, id));
+
+    await storeCourseFacts(db, read(id, 200));
+
+    const [stored] = await db.select().from(courses).where(eq(courses.id, id));
+    expect(stored).toMatchObject({ altitude: 200, altitudeSource: "wikipedia" });
+  });
+});
+
+describe("cards and coordinates from elsewhere", () => {
+  const holes = [{ number: 1, par: 4, yardages: {} }];
+  const url = "https://www.openstreetmap.org/way/1";
+
+  const accepted = async (values: Record<string, unknown>) => {
+    const id = await makeCourse();
+    await db.update(courses).set(values).where(eq(courses.id, id));
+    const [stored] = await db.select().from(courses).where(eq(courses.id, id));
+    return stored;
+  };
+
+  it("stores a card that names where it came from", async () => {
+    for (const holesSource of ["openstreetmap", "declared"]) {
+      const stored = await accepted({ holes, holesSource, holesSourceUrl: url });
+      expect(stored?.holesSource).toBe(holesSource);
+    }
+  });
+
+  it("refuses a card with no url, no Source, or a Source that may not supply one", async () => {
+    const name = "courses_holes_source_is_recorded";
+    expect(await refusal({ holes, holesSource: "declared" })).toBe(name);
+    expect(await refusal({ holes, holesSourceUrl: url })).toBe(name);
+    expect(await refusal({ holes, holesSource: "wikipedia", holesSourceUrl: url })).toBe(name);
+    expect(await refusal({ holesSource: "declared", holesSourceUrl: url })).toBe(name);
+  });
+
+  it("refuses coordinates that are partial, unsourced or impossible", async () => {
+    const name = "courses_coordinates_source_is_recorded";
+    const good = {
+      latitude: 22.9,
+      longitude: -109.98,
+      coordinatesSource: "openstreetmap",
+      coordinatesSourceUrl: url,
+    };
+    expect((await accepted(good))?.latitude).toBe(22.9);
+    expect(await refusal({ ...good, longitude: undefined })).toBe(name);
+    expect(await refusal({ ...good, coordinatesSource: undefined })).toBe(name);
+    expect(await refusal({ ...good, coordinatesSourceUrl: undefined })).toBe(name);
+    expect(await refusal({ ...good, latitude: 91 })).toBe(name);
+    expect(await refusal({ ...good, coordinatesSource: "wikipedia" })).toBe(name);
+  });
+});
+
 describe("courses", () => {
   it("refuses an altitude with no source_url", async () => {
     expect(await refusal({ altitude: 235 })).toBe("courses_altitude_source_is_recorded");
@@ -145,7 +224,7 @@ describe("courses", () => {
     ).toBe("courses_altitude_source_is_recorded");
   });
 
-  it("refuses an altitude whose source isn't wikipedia", async () => {
+  it("refuses an altitude from a Source that may not supply one", async () => {
     expect(
       await refusal({
         altitude: 235,

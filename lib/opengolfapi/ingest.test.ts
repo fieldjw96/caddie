@@ -93,6 +93,8 @@ describe("planCourses", () => {
     ]);
     expect(plan.rows).toHaveLength(1);
     expect(plan.rows[0]).toMatchObject({ attribution: ATTRIBUTION, holesTrusted: false });
+    // Written out every time, so a row whose OpenGolfAPI holes went away drops the old claim.
+    expect(plan.rows[0]).toMatchObject({ holesSource: null, holesSourceUrl: null });
     expect(requested).toHaveLength(2);
     expect(requested[0]).toContain("q=augusta+national");
     expect(requested[0]).toContain("state=GA");

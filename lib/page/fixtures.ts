@@ -9,6 +9,8 @@ export const TRUSTED_COURSE: CourseView = {
   architect: "Dick Wilson",
   sourceUrl: "https://api.opengolfapi.org/v1/courses/1",
   attribution: "Course data from OpenGolfAPI, ODbL 1.0",
+  holesSource: null,
+  holesSourceUrl: null,
   holesTrusted: true,
   holesCheckedTee: "championship",
   holesYardageSum: 7466,
@@ -16,6 +18,8 @@ export const TRUSTED_COURSE: CourseView = {
   publishedYardage: 7466,
   championshipTee: { name: "championship", slope: 150, rating: 77.1 },
   altitude: 105,
+  altitudeSource: "wikipedia",
+  elevationSourceUrl: null,
   greenSurface: "Bermuda",
   courseFactsSourceUrl: "https://en.wikipedia.org/w/index.php?title=Bay_Hill&oldid=1",
 };
@@ -36,6 +40,8 @@ export const TRUSTED_TRAITS: StoredTraits = {
 export const UNTRUSTED_COURSE: CourseView = {
   ...TRUSTED_COURSE,
   name: "Augusta National Golf Club",
+  holesSource: null,
+  holesSourceUrl: null,
   holesTrusted: false,
   holesCheckedTee: "member",
   holesYardageSum: 6475,
@@ -74,6 +80,8 @@ export const ARTICLE_COURSE: CourseView = {
   sourceUrl: "https://en.wikipedia.org/w/index.php?title=Baycurrent_Classic&oldid=1378612509",
   attribution:
     "Course facts from the English Wikipedia article on the Baycurrent Classic, CC BY-SA 4.0",
+  holesSource: null,
+  holesSourceUrl: null,
   holesTrusted: null,
   holesCheckedTee: null,
   holesYardageSum: null,
@@ -81,6 +89,8 @@ export const ARTICLE_COURSE: CourseView = {
   publishedYardage: 7315,
   championshipTee: null,
   altitude: null,
+  altitudeSource: null,
+  elevationSourceUrl: null,
   greenSurface: null,
   courseFactsSourceUrl: null,
 };
