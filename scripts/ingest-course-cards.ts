@@ -35,8 +35,13 @@ async function main(): Promise<void> {
         .update(courses)
         .set({ ...plan.card, ...plan.coordinates })
         .where(eq(courses.id, plan.courseId));
-      if (plan.card !== null) cards += 1;
-      const card = plan.card === null ? "no card" : `card from ${plan.card.holesSource}`;
+      if (plan.card?.holesSource) cards += 1;
+      const card =
+        plan.card === null
+          ? "no card"
+          : plan.card.holesSource === null
+            ? "card taken away, its entry has gone"
+            : `card from ${plan.card.holesSource}`;
       const where = plan.coordinates === null ? "" : ", coordinates from openstreetmap";
       console.log(`  ok    ${plan.name}: ${card}${where}`);
     }

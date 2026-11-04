@@ -100,19 +100,33 @@ export interface StoredCourseCard {
   latitude: number | null;
 }
 
+/** The columns a card occupies, all null once it has been taken away. */
+const NO_CARD = {
+  holes: null,
+  holesSource: null,
+  holesSourceUrl: null,
+  holesCheckedTee: null,
+  holesYardageSum: null,
+  holesYardageDifference: null,
+  holesTrusted: null,
+} as const;
+
 /** What to write to one Course, each part present only where there is something to write. */
 export interface CourseCardUpdate {
   courseId: number;
   name: string;
-  card: {
-    holes: CourseHole[];
-    holesSource: "declared" | "openstreetmap";
-    holesSourceUrl: string;
-    holesCheckedTee: string | null;
-    holesYardageSum: number | null;
-    holesYardageDifference: number | null;
-    holesTrusted: boolean | null;
-  } | null;
+  card:
+    | {
+        holes: CourseHole[];
+        holesSource: "declared" | "openstreetmap";
+        holesSourceUrl: string;
+        holesCheckedTee: string | null;
+        holesYardageSum: number | null;
+        holesYardageDifference: number | null;
+        holesTrusted: boolean | null;
+      }
+    | typeof NO_CARD
+    | null;
   coordinates: {
     latitude: number;
     longitude: number;
@@ -136,7 +150,8 @@ function parsOnly(pars: readonly number[]): CourseHole[] {
 /**
  * The write one Course needs, or null when it needs none. A card already written by this stage
  * is written again, because the card or the published total may have changed since; holes that
- * are the row's own never are.
+ * are the row's own never are. A card whose entry has gone is taken away: deleting an entry is
+ * how ADR 0005 answers an objection, so deleting it has to reach the page.
  */
 export function planCourseCard(
   course: StoredCourseCard,
@@ -170,6 +185,8 @@ export function planCourseCard(
       holesYardageDifference: null,
       holesTrusted: null,
     };
+  } else if (course.holesSource !== null) {
+    card = NO_CARD;
   }
 
   const coordinates: CourseCardUpdate["coordinates"] =

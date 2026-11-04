@@ -51,7 +51,7 @@ describe("planCourseCard", () => {
       holesTrusted: null,
       holesCheckedTee: null,
     });
-    expect(plan?.card?.holes.every((h) => Object.keys(h.yardages).length === 0)).toBe(true);
+    expect(plan?.card?.holes?.every((h) => Object.keys(h.yardages).length === 0)).toBe(true);
   });
 
   it("prefers a declared card, and checks it against the published total", () => {
@@ -80,6 +80,27 @@ describe("planCourseCard", () => {
     );
     expect(plan?.card?.holes).toHaveLength(18);
   });
+
+  it.each(["declared", "openstreetmap"] as const)(
+    "takes a %s card away once its entry has gone",
+    (holesSource) => {
+      const earlier = [{ number: 1, par: 4, yardages: {} }];
+      const plan = planCourseCard(
+        stored({ holes: earlier, holesSource, latitude: 1 }),
+        [],
+        [],
+      );
+      expect(plan?.card).toEqual({
+        holes: null,
+        holesSource: null,
+        holesSourceUrl: null,
+        holesCheckedTee: null,
+        holesYardageSum: null,
+        holesYardageDifference: null,
+        holesTrusted: null,
+      });
+    },
+  );
 
   it("takes coordinates from the map only where the row has none", () => {
     expect(planCourseCard(stored(), [], [mapped])?.coordinates).toEqual({
