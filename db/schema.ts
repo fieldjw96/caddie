@@ -238,7 +238,7 @@ export const courses = pgTable(
     check(
       "courses_coordinates_source_is_recorded",
       sql`(${t.latitude} is null and ${t.longitude} is null and ${t.coordinatesSource} is null and ${t.coordinatesSourceUrl} is null)
-        or (${t.latitude} between -90 and 90 and ${t.longitude} between -180 and 180 and ${t.coordinatesSource} is not null and ${t.coordinatesSource}::text in ('opengolfapi', 'openstreetmap') and ${t.coordinatesSourceUrl} is not null and btrim(${t.coordinatesSourceUrl}) <> '')`,
+        or (${t.latitude} is not null and ${t.longitude} is not null and ${t.latitude} between -90 and 90 and ${t.longitude} between -180 and 180 and ${t.coordinatesSource} is not null and ${t.coordinatesSource}::text in ('opengolfapi', 'openstreetmap') and ${t.coordinatesSourceUrl} is not null and btrim(${t.coordinatesSourceUrl}) <> '')`,
     ),
     // A verdict with its working, or no verdict: `holes_trusted` never stands alone.
     check(

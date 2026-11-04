@@ -1,5 +1,5 @@
 {
-  "id": "52de508a-e6ca-47ce-89d4-a2a8ebeb2c34",
+  "id": "7ee2112d-0720-4c48-85cb-0fa7928679b0",
   "prevId": "012a756a-9c97-48f6-b74f-03577e0c5965",
   "version": "7",
   "dialect": "postgresql",
@@ -376,7 +376,7 @@
         },
         "courses_coordinates_source_is_recorded": {
           "name": "courses_coordinates_source_is_recorded",
-          "value": "(\"courses\".\"latitude\" is null and \"courses\".\"longitude\" is null and \"courses\".\"coordinates_source\" is null and \"courses\".\"coordinates_source_url\" is null)\n        or (\"courses\".\"latitude\" between -90 and 90 and \"courses\".\"longitude\" between -180 and 180 and \"courses\".\"coordinates_source\" is not null and \"courses\".\"coordinates_source\"::text in ('opengolfapi', 'openstreetmap') and \"courses\".\"coordinates_source_url\" is not null and btrim(\"courses\".\"coordinates_source_url\") <> '')"
+          "value": "(\"courses\".\"latitude\" is null and \"courses\".\"longitude\" is null and \"courses\".\"coordinates_source\" is null and \"courses\".\"coordinates_source_url\" is null)\n        or (\"courses\".\"latitude\" is not null and \"courses\".\"longitude\" is not null and \"courses\".\"latitude\" between -90 and 90 and \"courses\".\"longitude\" between -180 and 180 and \"courses\".\"coordinates_source\" is not null and \"courses\".\"coordinates_source\"::text in ('opengolfapi', 'openstreetmap') and \"courses\".\"coordinates_source_url\" is not null and btrim(\"courses\".\"coordinates_source_url\") <> '')"
         },
         "courses_holes_check_is_complete": {
           "name": "courses_holes_check_is_complete",
