@@ -109,6 +109,36 @@ describe("PageView, rendered on the server", () => {
     );
   });
 
+  it("says a declared card was entered by hand, is not open, and where it came from", () => {
+    const url = "https://example.com/card";
+    const declared = {
+      ...DATA,
+      course: { ...DATA.course!, holesSource: "declared" as const, holesSourceUrl: url },
+    };
+    const t = text(declared);
+    expect(t).toContain("entered by hand");
+    expect(t).toContain("not openly licensed");
+    expect(html(declared)).toContain(`href="${url}"`);
+    expect(text(DATA)).not.toContain("entered by hand");
+  });
+
+  it("links OpenStreetMap's holes and the elevation reading to where they came from", () => {
+    const osm = "https://www.openstreetmap.org/way/1";
+    const reading = "https://api.open-meteo.com/v1/elevation?latitude=1";
+    const h = html({
+      ...DATA,
+      course: {
+        ...DATA.course!,
+        holesSource: "openstreetmap" as const,
+        holesSourceUrl: osm,
+        altitudeSource: "copernicus" as const,
+        elevationSourceUrl: reading,
+      },
+    });
+    expect(h).toContain(`href="${osm}"`);
+    expect(h).toContain(`href="${reading}"`);
+  });
+
   it("shows untrusted hole data as unavailable, with the reason", () => {
     const t = text(UNTRUSTED);
     expect(t).toContain("Unavailable.");
@@ -116,7 +146,7 @@ describe("PageView, rendered on the server", () => {
     expect(t).toContain("Trait unavailable");
   });
 
-  it("attributes all three Sources, linking to their licences", () => {
+  it("attributes every Source, linking to its licence", () => {
     for (const data of [DATA, null]) {
       const h = html(data);
       for (const source of Object.values(LICENCES)) {

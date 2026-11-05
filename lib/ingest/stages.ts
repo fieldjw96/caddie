@@ -5,6 +5,8 @@
 // - schedule before courses, which match the Course names it stored;
 // - players before results, which match names against players and never create one;
 // - courses before course facts and course traits, which add to and derive from its rows;
+// - course cards before course altitude, which reads the coordinates cards may have supplied,
+//   and both before course traits, which are derived from what they add;
 // - results before strengths, which are derived from them, and last because they also read
 //   the next Tournament's Course;
 // - a report after that, which counts what they stored;
@@ -28,6 +30,8 @@ export const STAGES: readonly Stage[] = [
   { name: "players", script: "ingest:players" },
   { name: "courses", script: "ingest:courses" },
   { name: "course facts", script: "ingest:course-facts" },
+  { name: "course cards", script: "ingest:course-cards" },
+  { name: "course altitude", script: "ingest:course-altitude" },
   { name: "results", script: "ingest:results" },
   { name: "course traits", script: "derive:course-traits" },
   { name: "strengths", script: "derive:strengths" },

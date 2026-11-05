@@ -4,7 +4,14 @@ import { describe, expect, it } from "vitest";
 import augusta from "./fixtures/augusta-national.detail.json";
 import bayHill from "./fixtures/bay-hill.search.json";
 import { OpenGolfApiClient } from "./client";
-import { planCourses, RunStopped, toCourseRow, type ScheduledTournament } from "./ingest";
+import {
+  planCourses,
+  RunStopped,
+  sourceUrl,
+  toCourseRow,
+  type ScheduledTournament,
+} from "./ingest";
+import { courseResponse } from "./schema";
 import { fakeFetch, type Reply } from "./test-fetch";
 
 const ATTRIBUTION =
@@ -75,6 +82,31 @@ describe("toCourseRow", () => {
   });
 });
 
+describe("toCourseRow's coordinates", () => {
+  // `lat` and `lng` as the detail route returned them for Waialae on 2026-11-04.
+  const base = courseResponse.parse(augusta);
+
+  it("stores them with where they came from", () => {
+    const row = toCourseRow({ ...base, lat: 21.2705403, lng: -157.7762504 }, "attribution");
+    expect(row).toMatchObject({
+      latitude: 21.2705403,
+      longitude: -157.7762504,
+      coordinatesSource: "opengolfapi",
+      coordinatesSourceUrl: sourceUrl(base.id),
+    });
+  });
+
+  it("stores neither when either is missing", () => {
+    const row = toCourseRow({ ...base, lat: 21.27, lng: null }, "attribution");
+    expect(row).toMatchObject({ latitude: null, longitude: null, coordinatesSource: null });
+  });
+
+  it("reads them under the field names the API uses", () => {
+    const parsed = courseResponse.parse({ ...augusta, lat: 1, lng: 2 });
+    expect([parsed.lat, parsed.lng]).toEqual([1, 2]);
+  });
+});
+
 describe("planCourses", () => {
   it("matches each Tournament within its state and fetches the course once", async () => {
     const { api, requested } = client(augustaRoutes);
@@ -93,6 +125,8 @@ describe("planCourses", () => {
     ]);
     expect(plan.rows).toHaveLength(1);
     expect(plan.rows[0]).toMatchObject({ attribution: ATTRIBUTION, holesTrusted: false });
+    // Written out every time, so a row whose OpenGolfAPI holes went away drops the old claim.
+    expect(plan.rows[0]).toMatchObject({ holesSource: null, holesSourceUrl: null });
     expect(requested).toHaveLength(2);
     expect(requested[0]).toContain("q=augusta+national");
     expect(requested[0]).toContain("state=GA");

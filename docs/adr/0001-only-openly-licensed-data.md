@@ -38,6 +38,9 @@ in 2022.
 > course-fit model is out of scope. The prohibitions in this ADR all still stand, and so
 > does everything below about Source and Derived.
 
+> **Added to by ADR 0005**, which adds OpenStreetMap and the Copernicus elevation model, and
+> records one hand-entered card as an exception to the rule.
+
 **Only data under an open licence may be stored or displayed.** Wikidata (CC0), Wikipedia
 (CC BY-SA 4.0), OpenGolfAPI (ODbL 1.0). Each carries its attribution obligation and the site
 discharges it visibly.

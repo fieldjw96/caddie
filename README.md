@@ -55,6 +55,15 @@ about a request a second:
 
     npm run ingest:course-facts
 
+Cards and altitude, for the Courses that leaves short. A Course with no holes of its own gets
+its pars from `data/osm-course-holes.json`, or a card declared in `lib/courses/cards.ts`, and any
+Course with coordinates and no altitude gets one from the Copernicus elevation model. See ADR 0005.
+The snapshot is refreshed by hand, with `npm run snapshot:osm-courses`, and is not part of the
+daily run:
+
+    npm run ingest:course-cards
+    npm run ingest:course-altitude
+
 Course Traits, derived from the courses just ingested into `course_traits`. Idempotent, and
 refuses any Trait built on hole yardages for a course whose `holes_trusted` is false:
 

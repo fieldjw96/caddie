@@ -58,6 +58,10 @@ const hole = z.object({
  * tees or yardage, and says so in its own `_upgrade` field; this one is the full record.
  */
 export const courseResponse = z.object({
+  // Read only to find the Course on the elevation model. Absent is allowed, so a record without
+  // them still gives us its card: it just gets no altitude.
+  lat: z.number().min(-90).max(90).nullish(),
+  lng: z.number().min(-180).max(180).nullish(),
   id: z.string().min(1),
   course_name: z.string().min(1),
   par: z.number().int().positive().nullable(),

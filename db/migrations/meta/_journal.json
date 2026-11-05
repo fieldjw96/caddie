@@ -71,6 +71,13 @@
       "when": 1791505605312,
       "tag": "0009_tournament_article_course",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793824587502,
+      "tag": "0010_course_cards_and_elevation",
+      "breakpoints": true
     }
   ]
 }

@@ -49,6 +49,9 @@ export interface CourseView {
   architect: string | null;
   sourceUrl: string | null;
   attribution: string | null;
+  /** Where the holes came from, when not the Course's own Source. See ADR 0005. */
+  holesSource: Source | null;
+  holesSourceUrl: string | null;
   holesTrusted: boolean | null;
   holesCheckedTee: string | null;
   holesYardageSum: number | null;
@@ -56,11 +59,14 @@ export interface CourseView {
   publishedYardage: number | null;
   /** The tee whose card matches the published total, where one does. */
   championshipTee: { name: string; slope: number | null; rating: number | null } | null;
-  /** Feet above sea level, from the Course's own Wikipedia article. Most articles lack it. */
+  /** Feet above sea level, from the Course's own Wikipedia article or the elevation model. */
   altitude: number | null;
+  altitudeSource: Source | null;
+  /** The elevation request behind an altitude read off the model, and null for any other. */
+  elevationSourceUrl: string | null;
   /** The putting surface, verbatim from the Course's own Wikipedia article. */
   greenSurface: string | null;
-  /** Where altitude and/or green surface were read, whichever is stored. */
+  /** The Wikipedia revision altitude and/or green surface were read at, whichever is stored. */
   courseFactsSourceUrl: string | null;
 }
 
@@ -175,13 +181,20 @@ const yards = (n: number) => `${Math.round(n).toLocaleString("en-US")} yards`;
  */
 export function holesUnavailableReason(course: CourseView | null): string {
   if (course === null) return "No Course is matched to this Tournament.";
+  // OpenStreetMap's holes give a par and a line on a map, and a line is not a card: the Course
+  // has holes, so the sentence below would be untrue, but it has no yardage to measure.
+  if (course.holesSource === "openstreetmap") {
+    return "Not shown: OpenStreetMap gives this Course's pars but no card yardages, so there is no par 4 length to measure.";
+  }
   // A Course OpenGolfAPI does not have at all, read from the Tournament's own Wikipedia
   // article: that article states a published total, never a card, so there is no hole-by-hole
   // data to check rather than some that failed a check. Saying OpenGolfAPI "gave no hole
   // data" would name the wrong Source for the gap.
-  if (course.source === "wikipedia") {
+  if (course.source === "wikipedia" && course.holesSource === null) {
     return "Not shown: this Course comes from the Tournament's own Wikipedia article, which states a published total rather than a hole-by-hole card.";
   }
+  const whose =
+    course.holesSource === "declared" ? "The hand-entered card's" : "OpenGolfAPI's";
   if (course.holesTrusted === false) {
     const sum = course.holesYardageSum;
     const published = course.publishedYardage;
@@ -189,12 +202,15 @@ export function holesUnavailableReason(course: CourseView | null): string {
     if (sum !== null && published !== null && difference !== null) {
       const direction = difference < 0 ? "short of" : "over";
       return (
-        `Not shown: OpenGolfAPI's hole-by-hole yardages${course.holesCheckedTee ? ` from the ${course.holesCheckedTee} tees` : ""} ` +
+        `Not shown: ${whose} hole-by-hole yardages${course.holesCheckedTee ? ` from the ${course.holesCheckedTee} tees` : ""} ` +
         `add up to ${yards(sum)}, ${yards(Math.abs(difference))} ${direction} the published ` +
         `${yards(published)}, so every Trait built on the holes is refused.`
       );
     }
-    return "Not shown: OpenGolfAPI's hole-by-hole yardages disagree with the published total, so every Trait built on the holes is refused.";
+    return `Not shown: ${whose} hole-by-hole yardages disagree with the published total, so every Trait built on the holes is refused.`;
+  }
+  if (course.holesTrusted === null && course.holesSource === "declared") {
+    return "Not shown: the hand-entered card could not be checked, because no published total is stored for this Course.";
   }
   if (course.holesTrusted === null) {
     return "Not shown: OpenGolfAPI gave no hole-by-hole data that could be checked against the published total.";
@@ -209,7 +225,7 @@ export function holesUnavailableReason(course: CourseView | null): string {
  */
 export function parUnavailableReason(course: CourseView | null): string {
   if (course === null) return "No Course is matched to this Tournament.";
-  if (course.source === "wikipedia") {
+  if (course.source === "wikipedia" && course.holesSource === null) {
     return "Not shown: this Course comes from the Tournament's own Wikipedia article, which states a published total rather than a hole-by-hole card.";
   }
   return "Not shown: this Course fails the par check — not exactly 18 holes, each an integer par, summing to the published par — so the par mix is refused.";
@@ -316,7 +332,8 @@ export function courseProfile(course: CourseView | null, traits: StoredTraits): 
     altitude !== null
       ? {
           label: "Altitude",
-          value: `${altitude.toLocaleString("en-US")} feet above sea level`,
+          // "about" only for the model: one reading on a grid 90 metres square, not a survey.
+          value: `${course?.altitudeSource === "copernicus" ? "about " : ""}${altitude.toLocaleString("en-US")} feet above sea level`,
         }
       : {
           label: "Altitude",

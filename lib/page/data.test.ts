@@ -8,6 +8,8 @@ import {
   formatFreshnessDate,
   isStale,
   matchCourse,
+  holesUnavailableReason,
+  parUnavailableReason,
 } from "./data";
 import {
   TRUSTED_COURSE,
@@ -127,6 +129,39 @@ describe("courseProfile", () => {
     expect(greenSurface && "reason" in greenSurface ? greenSurface.reason : "").toContain(
       "no Source we hold has stored this Course's green surface",
     );
+  });
+
+  it("says about for an altitude read off the elevation model", () => {
+    const course = { ...TRUSTED_COURSE, altitude: 174, altitudeSource: "copernicus" as const };
+    const altitude = courseProfile(course, TRUSTED_TRAITS).find((l) => l.label === "Altitude");
+    expect(altitude?.value).toBe("about 174 feet above sea level");
+  });
+
+  it("names the hand-entered card, not OpenGolfAPI, when that card fails its check", () => {
+    const declared = {
+      ...UNTRUSTED_COURSE,
+      source: "wikipedia" as const,
+      holesSource: "declared" as const,
+      holesSourceUrl: "https://example.com/card",
+    };
+    const reason = holesUnavailableReason(declared);
+    expect(reason).toContain("The hand-entered card's");
+    expect(reason).not.toContain("OpenGolfAPI");
+    expect(holesUnavailableReason({ ...declared, holesTrusted: null })).toContain(
+      "hand-entered card could not be checked",
+    );
+  });
+
+  it("does not blame the Wikipedia article for a Course with holes from elsewhere", () => {
+    const osm = {
+      ...TRUSTED_COURSE,
+      source: "wikipedia" as const,
+      holesSource: "openstreetmap" as const,
+      holesSourceUrl: "https://www.openstreetmap.org/way/1",
+      holesTrusted: null,
+    };
+    expect(holesUnavailableReason(osm)).toContain("no card yardages");
+    expect(parUnavailableReason(osm)).toContain("fails the par check");
   });
 
   it("shows the raw length alone when no altitude-adjusted length is stored", () => {

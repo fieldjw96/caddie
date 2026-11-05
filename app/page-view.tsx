@@ -31,6 +31,21 @@ export const LICENCES = {
     licenceUrl: "https://opendatacommons.org/licenses/odbl/1-0/",
     covers: "the Course: par, yardage, tees, Slope and Rating, hole by hole",
   },
+  openstreetmap: {
+    name: "OpenStreetMap",
+    home: "https://www.openstreetmap.org/copyright",
+    licence: "ODbL 1.0",
+    licenceUrl: "https://opendatacommons.org/licenses/odbl/1-0/",
+    covers:
+      "hole-by-hole pars and the location of a Course OpenGolfAPI has no holes for, © OpenStreetMap contributors",
+  },
+  copernicus: {
+    name: "Copernicus DEM GLO-90, through Open-Meteo",
+    home: "https://open-meteo.com/en/docs/elevation-api",
+    licence: "CC BY 4.0",
+    licenceUrl: "https://creativecommons.org/licenses/by/4.0/",
+    covers: "a Course's altitude where its Wikipedia article states none",
+  },
   wikidata: {
     name: "Wikidata",
     home: "https://www.wikidata.org/",
@@ -95,6 +110,34 @@ function Attribution({ data }: { data: PageData | null }) {
             the Wikipedia revision they were read from
           </a>
           .
+        </p>
+      )}
+      {data?.course?.elevationSourceUrl && (
+        <p className="mt-1 text-muted">
+          Altitude:{" "}
+          <a href={data.course.elevationSourceUrl} className="underline">
+            the elevation reading at this Course
+          </a>
+          .
+        </p>
+      )}
+      {data?.course?.holesSource === "openstreetmap" && data.course.holesSourceUrl && (
+        <p className="mt-1 text-muted">
+          Hole-by-hole pars:{" "}
+          <a href={data.course.holesSourceUrl} className="underline">
+            this Course on OpenStreetMap
+          </a>
+          .
+        </p>
+      )}
+      {data?.course?.holesSource === "declared" && data.course.holesSourceUrl && (
+        <p className="mt-1 text-muted">
+          Hole-by-hole card: entered by hand from{" "}
+          <a href={data.course.holesSourceUrl} className="underline">
+            a published scorecard
+          </a>
+          , because no open Source holds it. It is not openly licensed, and is the one
+          exception to the rule above.
         </p>
       )}
       <p className="mt-2 text-muted">

@@ -131,6 +131,8 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
           architect: courseRow.architect,
           sourceUrl: courseRow.sourceUrl,
           attribution: courseRow.attribution,
+          holesSource: courseRow.holesSource,
+          holesSourceUrl: courseRow.holesSourceUrl,
           holesTrusted: courseRow.holesTrusted,
           holesCheckedTee: courseRow.holesCheckedTee,
           holesYardageSum: courseRow.holesYardageSum,
@@ -138,8 +140,14 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
           publishedYardage: courseRow.publishedYardage,
           championshipTee: championshipTee(courseRow.tees, courseRow.publishedYardage),
           altitude: courseRow.altitude,
+          altitudeSource: courseRow.altitudeSource,
+          elevationSourceUrl:
+            courseRow.altitudeSource === "copernicus" ? courseRow.altitudeSourceUrl : null,
           greenSurface: courseRow.greenSurface,
-          courseFactsSourceUrl: courseRow.altitudeSourceUrl ?? courseRow.greenSurfaceSourceUrl,
+          courseFactsSourceUrl:
+            courseRow.altitudeSource === "wikipedia"
+              ? courseRow.altitudeSourceUrl
+              : courseRow.greenSurfaceSourceUrl,
         };
 
   return {
