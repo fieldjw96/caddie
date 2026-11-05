@@ -199,9 +199,9 @@ describe("Ranking", () => {
     expect(ranked).toHaveLength(3);
     // Verify each row has the correct rank number.
     for (let i = 0; i < ranked.length; i++) {
-      const playerRow = row(ranked[i]);
-      const rankCell = playerRow?.cells[0]?.textContent?.trim();
-      expect(rankCell).toBe((i + 1).toString());
+      const playerRow = row(ranked[i]!);
+      const rankNumber = (playerRow?.cells[0]?.textContent ?? "").trim();
+      expect(rankNumber).toBe((i + 1).toString());
     }
   });
 
