@@ -22,6 +22,7 @@ import {
   type Weightings,
 } from "../lib/fit";
 import { listInWords, type PlayerView, type StrengthView } from "../lib/page/data";
+import { SECTION_HEADING } from "./styles";
 
 export const TRAIT_LABELS: Readonly<Record<FitTraitName, string>> = {
   length_yards: "Length",
@@ -60,9 +61,9 @@ const results = (n: number) => `${n} result${n === 1 ? "" : "s"}`;
 function StrengthCell({ strength }: { strength: StrengthView | null }) {
   const sample = strength?.sampleSize ?? 0;
   return (
-    <td className="px-2 py-1.5 text-right align-top whitespace-nowrap">
+    <td className="px-3 py-2 text-right align-top whitespace-nowrap">
       {strength?.value != null ? (
-        <span>{Math.round(strength.value * 100)}%</span>
+        <span className="font-medium">{Math.round(strength.value * 100)}%</span>
       ) : (
         <span className="text-gap italic">no record</span>
       )}
@@ -82,7 +83,9 @@ function ContributionCell({ component }: { component: FitComponent }) {
   } else {
     body = <span className="text-gap italic">no record</span>;
   }
-  return <td className="px-2 py-1.5 text-right align-top whitespace-nowrap">{body}</td>;
+  return (
+    <td className="px-3 py-2 text-right align-top font-semibold whitespace-nowrap">{body}</td>
+  );
 }
 
 /**
@@ -103,7 +106,7 @@ function Answer({
 }) {
   if (ranked.scored.length === 0) {
     return (
-      <p data-testid="answer" className="mt-3 max-w-prose text-lg">
+      <p data-testid="answer" className="max-w-prose text-lg">
         {unscoredReason === "course" ? (
           courseOrWeightingsSentence
         ) : unscoredReason === "weightings" ? (
@@ -134,12 +137,40 @@ function Answer({
   const names = listInWords(top3.map(({ player }) => player.name));
 
   return (
-    <p data-testid="answer" className="mt-3 max-w-prose text-lg">
-      On the current Weightings, {names} {top3.length > 1 ? "lead" : "leads"} the field by Fit
-      Score. {leader.player.name}&rsquo;s largest contribution comes from{" "}
-      {TRAIT_LABELS[leading.trait]}, which calls for{" "}
-      {STRENGTH_LABELS[TRAIT_SCALES[leading.trait].calls]}.
-    </p>
+    <section aria-labelledby="top-of-the-fit">
+      <h2 id="top-of-the-fit" className={SECTION_HEADING}>
+        Top of the fit
+      </h2>
+      <ol className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {top3.map(({ player, fit }, index) => (
+          <li key={player.id} className="flex items-stretch border-2 border-band">
+            <span
+              aria-hidden="true"
+              className="flex w-16 shrink-0 items-center justify-center bg-band font-display text-[2.75rem] font-extrabold text-on-band"
+            >
+              {index + 1}
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
+              <span className="font-display text-2xl leading-none font-bold uppercase">
+                {player.name}
+              </span>
+              {player.country && <span className="text-sm text-muted">{player.country}</span>}
+            </span>
+            <span
+              className={`flex items-center px-4 font-display text-[2.5rem] font-bold ${tone(fit.score)}`}
+            >
+              {signed(fit.score, 3)}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p data-testid="answer" className="mt-4 max-w-prose text-lg">
+        On the current Weightings, {names} {top3.length > 1 ? "lead" : "leads"} the field by
+        Fit Score. {leader.player.name}&rsquo;s largest contribution comes from{" "}
+        {TRAIT_LABELS[leading.trait]}, which calls for{" "}
+        {STRENGTH_LABELS[TRAIT_SCALES[leading.trait].calls]}.
+      </p>
+    </section>
   );
 }
 
@@ -152,8 +183,8 @@ function UnscoredList({
   unscored: readonly { player: PlayerView; fit: FitScore }[];
 }) {
   return (
-    <details className="mt-3 rounded border border-rule p-3" open={unscored.length <= 40}>
-      <summary className="cursor-pointer text-sm font-medium">
+    <details className="mt-3 border border-rule-strong p-3" open={unscored.length <= 40}>
+      <summary className="cursor-pointer font-display text-lg font-bold tracking-[0.04em] uppercase">
         Show all {unscored.length}
       </summary>
       <ul className="mt-3 columns-1 gap-6 text-sm sm:columns-2 lg:columns-3">
@@ -277,11 +308,16 @@ export function Ranking({
         courseOrWeightingsSentence={courseOrWeightingsSentence}
       />
       {children}
-      <section aria-labelledby="ranking" className="mt-10">
-        <h2 id="ranking" className="text-xl font-semibold">
+      <section aria-labelledby="ranking" className="mt-14">
+        <h2 id="ranking" className={SECTION_HEADING}>
           The roster, ordered by Fit Score
         </h2>
-        <p className="mt-2 max-w-prose text-sm text-muted">
+        <p className="mt-2 text-sm text-muted">
+          <span className="font-semibold text-gain">Red +</span> adds to the Fit Score, as
+          under par does on a leaderboard; <span className="font-semibold text-loss">−</span>{" "}
+          takes away.
+        </p>
+        <p className="mt-2 max-w-prose text-[0.95rem] text-muted">
           Each Trait&rsquo;s contribution is its Weighting, times how much this Course asks for
           the Strength it calls for, times the Player&rsquo;s edge in that Strength over the
           middle of the field. The Fit Score is their sum, between −{totalWeight.toFixed(2)}{" "}
@@ -293,51 +329,51 @@ export function Ranking({
         </p>
 
         {ranked.scored.length === 0 ? (
-          <p className="mt-4 rounded border border-rule bg-gap-panel p-3 text-sm">
+          <p className="mt-4 border border-gap-rule bg-gap-panel p-3 text-sm">
             {unscoredReason === "record"
               ? "No Player has a Fit Score: no Player has enough results for a Strength this " +
                 "Course asks for."
               : courseOrWeightingsSentence}
           </p>
         ) : (
-          <div className="mt-4 overflow-x-auto rounded border border-rule sm:max-h-[36rem] sm:overflow-y-auto">
-            <table className="w-full min-w-[68rem] border-collapse text-sm">
-              <thead className="sticky top-0 bg-panel text-xs text-muted">
+          <div className="mt-4 overflow-x-auto border-2 border-band sm:max-h-[36rem] sm:overflow-y-auto">
+            <table className="w-full min-w-[68rem] border-collapse text-[0.95rem]">
+              <thead className="sticky top-0 z-30 bg-band font-display text-base tracking-[0.06em] text-on-band uppercase">
                 <tr>
                   <th
                     scope="col"
-                    className="sticky left-0 z-20 w-12 bg-panel px-2 py-2 text-right font-medium"
+                    className="sticky left-0 z-20 w-14 bg-band px-2 py-2.5 text-center font-bold"
                   >
                     #
                   </th>
                   <th
                     scope="col"
-                    className="sticky left-12 z-20 min-w-[9rem] bg-panel px-2 py-2 text-left font-medium"
+                    className="sticky left-14 z-20 min-w-[11rem] bg-band px-3 py-2.5 text-left font-bold"
                   >
                     Player
                   </th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
                     Fit Score
                   </th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
                     Skill
                   </th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
                     Consistency
                   </th>
-                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
                     Low rounds
                   </th>
                   {FIT_TRAITS.map((t) => (
-                    <th key={t} scope="col" className="px-2 py-2 text-right font-medium">
+                    <th key={t} scope="col" className="px-3 py-2.5 text-right font-bold">
                       {TRAIT_LABELS[t]}
                     </th>
                   ))}
-                  <th scope="col" className="px-2 py-2 text-right font-medium">
+                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
                     Form
                   </th>
                   {hasVenue && (
-                    <th scope="col" className="px-2 py-2 text-right font-medium">
+                    <th scope="col" className="px-3 py-2.5 text-right font-bold">
                       Record here
                     </th>
                   )}
@@ -347,25 +383,31 @@ export function Ranking({
                 {ranked.scored.map(({ player, fit }, index) => (
                   <tr
                     key={player.id}
-                    className="border-t border-rule"
+                    className="border-t border-rule odd:bg-paper even:bg-row-alt"
                     data-player={player.name}
                   >
-                    <td className="sticky left-0 z-10 w-12 bg-paper px-2 py-1.5 text-right align-top text-muted">
-                      {index + 1}
+                    <td className="sticky left-0 z-10 w-14 bg-inherit px-2 py-2 text-center align-top">
+                      <span className="inline-block min-w-8 bg-band py-0.5 font-display text-xl font-bold text-on-band">
+                        {index + 1}
+                      </span>
                     </td>
                     <th
                       scope="row"
-                      className="sticky left-12 z-10 min-w-[9rem] bg-paper px-2 py-1.5 text-left align-top font-medium"
+                      className="sticky left-14 z-10 min-w-[11rem] bg-inherit px-3 py-2 text-left align-top"
                     >
-                      {player.name}
+                      <span className="font-display text-xl font-bold uppercase">
+                        {player.name}
+                      </span>
                       {player.country && (
-                        <span className="block text-xs font-normal text-muted">
+                        <span className="block text-[0.8rem] font-normal text-muted">
                           {player.country}
                         </span>
                       )}
                     </th>
-                    <td className="px-2 py-1.5 text-right align-top whitespace-nowrap">
-                      <span className={`font-semibold ${tone(fit.score)}`}>
+                    <td className="px-3 py-2 text-right align-top whitespace-nowrap">
+                      <span
+                        className={`inline-block border border-rule-strong bg-paper px-2 font-display text-2xl font-bold ${tone(fit.score)}`}
+                      >
                         {signed(fit.score, 3)}
                       </span>
                       <span className="block text-xs text-muted">
@@ -396,8 +438,8 @@ export function Ranking({
         )}
       </section>
 
-      <section aria-labelledby="weightings" className="mt-10">
-        <h2 id="weightings" className="text-xl font-semibold">
+      <section aria-labelledby="weightings" className="mt-14">
+        <h2 id="weightings" className={SECTION_HEADING}>
           The Weightings
         </h2>
         <p className="mt-2 max-w-prose text-sm text-muted">
@@ -406,46 +448,57 @@ export function Ranking({
           {!interactive &&
             " The sliders need JavaScript; the ranking above uses the values shown."}
         </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 border-t-2 border-band">
           {FIT_TRAITS.map((trait) => {
             const scale = TRAIT_SCALES[trait];
             const value = traits[trait] ?? null;
             const asks = value === null ? null : normalise(value, scale.min, scale.max);
             const id = `weighting-${trait}`;
             return (
-              <div key={trait} className="rounded border border-rule bg-panel p-3">
-                <div className="flex items-baseline justify-between gap-2">
-                  <label htmlFor={id} className="font-medium">
+              <div
+                key={trait}
+                className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-rule py-4"
+              >
+                <div className="min-w-[16rem] flex-[1_1_16rem]">
+                  <label
+                    htmlFor={id}
+                    className="font-display text-[1.375rem] font-bold uppercase"
+                  >
                     {TRAIT_LABELS[trait]}
                   </label>
-                  <output htmlFor={id} className="font-semibold">
-                    {weightings[trait].toFixed(2)}
-                  </output>
+                  <p className="mt-1 text-sm">
+                    <strong>Calls for {STRENGTH_LABELS[scale.calls]}.</strong> {scale.why}
+                  </p>
                 </div>
-                <input
-                  id={id}
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={weightings[trait]}
-                  disabled={!interactive}
-                  onChange={(e) =>
-                    setWeightings((w) => ({ ...w, [trait]: Number(e.target.value) }))
-                  }
-                  className="mt-2 w-full"
-                />
-                <p className="mt-1 text-sm">
-                  <strong>Calls for {STRENGTH_LABELS[scale.calls]}.</strong> {scale.why}
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  Scaled from {formatRangeEnd(trait, scale.min)} to{" "}
-                  {formatRangeEnd(trait, scale.max)};{" "}
-                  {asks === null
-                    ? "unknown for this Course, so it counts for nobody."
-                    : `this Course asks ${asks.toFixed(2)} of 1.`}{" "}
-                  Declared: {DEFAULT_WEIGHTINGS[trait].toFixed(2)}.
-                </p>
+                <div className="min-w-[16rem] flex-[2_1_20rem]">
+                  <input
+                    id={id}
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={weightings[trait]}
+                    disabled={!interactive}
+                    onChange={(e) =>
+                      setWeightings((w) => ({ ...w, [trait]: Number(e.target.value) }))
+                    }
+                    className="w-full"
+                  />
+                  <p className="mt-1 text-xs text-muted">
+                    Scaled from {formatRangeEnd(trait, scale.min)} to{" "}
+                    {formatRangeEnd(trait, scale.max)};{" "}
+                    {asks === null
+                      ? "unknown for this Course, so it counts for nobody."
+                      : `this Course asks ${asks.toFixed(2)} of 1.`}{" "}
+                    Declared: {DEFAULT_WEIGHTINGS[trait].toFixed(2)}.
+                  </p>
+                </div>
+                <output
+                  htmlFor={id}
+                  className="min-w-[4.5rem] bg-band px-2 py-1 text-center font-display text-[1.75rem] font-bold text-on-band"
+                >
+                  {weightings[trait].toFixed(2)}
+                </output>
               </div>
             );
           })}
@@ -454,7 +507,7 @@ export function Ranking({
           <button
             type="button"
             onClick={() => setWeightings(DEFAULT_WEIGHTINGS)}
-            className="mt-4 rounded border border-rule px-3 py-1.5 text-sm hover:bg-panel"
+            className="mt-4 border-2 border-band px-4 py-2 font-display text-lg font-bold tracking-[0.04em] uppercase hover:bg-panel"
           >
             Back to the declared Weightings
           </button>
@@ -463,8 +516,8 @@ export function Ranking({
 
       {ranked.unscored.length > 0 &&
         (unscoredReason === "record" ? (
-          <section aria-labelledby="no-record" className="mt-10">
-            <h2 id="no-record" className="text-xl font-semibold">
+          <section aria-labelledby="no-record" className="mt-14">
+            <h2 id="no-record" className={SECTION_HEADING}>
               Players with no usable record
             </h2>
             <p className="mt-2 max-w-prose text-sm text-muted">
@@ -476,8 +529,8 @@ export function Ranking({
             <UnscoredList unscored={ranked.unscored} />
           </section>
         ) : (
-          <section aria-labelledby="unscored" className="mt-10">
-            <h2 id="unscored" className="text-xl font-semibold">
+          <section aria-labelledby="unscored" className="mt-14">
+            <h2 id="unscored" className={SECTION_HEADING}>
               {unscoredReason === "weightings"
                 ? "No Player has a Fit Score on the current Weightings"
                 : "No Player has a Fit Score at this Course"}

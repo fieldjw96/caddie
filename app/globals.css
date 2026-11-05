@@ -1,50 +1,79 @@
 @import "tailwindcss";
 
 /*
- * The page's colours, as tokens. There is no theme toggle: the reader's system setting picks
- * the palette and the page follows it. Anything that draws text, a chart included, takes its
- * colour from these variables so it is legible in both.
+ * The page's colours, as tokens: the Leaderboard look. A navy band, white ground, and the
+ * scoreboard's convention that red is the good number (as under par is). There is no theme
+ * toggle: the reader's system setting picks the palette and the page follows it. Anything
+ * that draws text, a chart included, takes its colour from these variables so it is legible
+ * in both.
+ *
+ * `gain` is red and `loss` is the ink colour, so the two differ in lightness as well as hue,
+ * and every signed value still carries its + or − sign.
  */
 :root {
-  --paper: #fbfaf6;
-  --panel: #f2f1ea;
-  --ink: #17201b;
-  --muted: #56615a;
-  --rule: #d7dbd3;
-  --accent: #1d6b45;
-  --gain: #1d6b45;
-  --loss: #a33a2a;
-  --gap: #8a5a00;
-  --gap-panel: #fbf1dc;
+  --paper: #ffffff;
+  --panel: #eef2f7;
+  --row-alt: #f5f7fa;
+  --ink: #0b1f3a;
+  --muted: #55657c;
+  --rule: #dbe2ec;
+  --rule-strong: #c9d3e0;
+  --band: #0b1f3a;
+  --on-band: #ffffff;
+  --on-band-muted: #b8c4d6;
+  --highlight: #f2c14e;
+  --accent: #c8102e;
+  --gain: #c8102e;
+  --loss: #0b1f3a;
+  --gap: #7a5000;
+  --gap-panel: #fff4d6;
+  --gap-rule: #ecd9a6;
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #111613;
-    --panel: #1a211d;
-    --ink: #e7ece8;
-    --muted: #9ba89f;
-    --rule: #2e3832;
-    --accent: #6fcf9a;
-    --gain: #6fcf9a;
-    --loss: #f08f7d;
+    --paper: #0a1322;
+    --panel: #14223a;
+    --row-alt: #0f1b2e;
+    --ink: #e6edf6;
+    --muted: #9fb0c6;
+    --rule: #1f2f4a;
+    --rule-strong: #2c3f60;
+    --band: #1a2f52;
+    --on-band: #ffffff;
+    --on-band-muted: #b8c4d6;
+    --highlight: #f2c14e;
+    --accent: #ff7a8a;
+    --gain: #ff7a8a;
+    --loss: #e6edf6;
     --gap: #e8b75a;
     --gap-panel: #2a2314;
+    --gap-rule: #4a3d1f;
   }
 }
 
 @theme inline {
   --color-paper: var(--paper);
   --color-panel: var(--panel);
+  --color-row-alt: var(--row-alt);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-band: var(--band);
+  --color-on-band: var(--on-band);
+  --color-on-band-muted: var(--on-band-muted);
+  --color-highlight: var(--highlight);
   --color-accent: var(--accent);
   --color-gain: var(--gain);
   --color-loss: var(--loss);
   --color-gap: var(--gap);
   --color-gap-panel: var(--gap-panel);
+  --color-gap-rule: var(--gap-rule);
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    var(--font-barlow-condensed), var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
