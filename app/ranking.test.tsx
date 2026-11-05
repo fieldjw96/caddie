@@ -195,7 +195,14 @@ describe("Ranking", () => {
     const table = screen.getByRole("table");
     expect(table).toBeTruthy();
     expect(within(table).getAllByRole("rowheader").length).toBeGreaterThan(0);
-    expect(order()).toHaveLength(3);
+    const ranked = order();
+    expect(ranked).toHaveLength(3);
+    // Verify each row has the correct rank number.
+    for (let i = 0; i < ranked.length; i++) {
+      const playerRow = row(ranked[i]);
+      const rankCell = playerRow?.cells[0]?.textContent?.trim();
+      expect(rankCell).toBe((i + 1).toString());
+    }
   });
 
   it("says the Course has no known Fit Trait, not that the Players lack a record, when none is known", () => {
