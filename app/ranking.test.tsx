@@ -163,13 +163,12 @@ describe("Ranking", () => {
   });
 
   it("says the Course, not the Players' record, is why nothing separates them when its only known Trait is below its range", () => {
-    // Case 1: Port Royal's only known Trait, length, falls below the bottom of its range. Every
-    // Player here has every Strength known, which is the point: the reason is the Course, not
-    // their record.
-    render(<Ranking players={PLAYERS} traits={{ length_yards: 6_800 }} hasVenue={false} />);
+    // Case 1: A very short course, shorter than any Tour course. Every Player here has every
+    // Strength known, which is the point: the reason is the Course, not their record.
+    render(<Ranking players={PLAYERS} traits={{ length_yards: 6_400 }} hasVenue={false} />);
 
     const blockingSentence =
-      /This Course.s known Traits all sit at or below the bottom of their ranges on the current Weightings, so nothing separates the Players: Length is 6,800, at or below the minimum of 6,900\./;
+      /This Course.s known Traits all sit at or below the bottom of their ranges on the current Weightings, so nothing separates the Players: Length is 6,400, at or below the minimum of 6,500\./;
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryAllByRole("rowheader")).toHaveLength(0);
     expect(within(rankingSection()).getByText(blockingSentence)).toBeTruthy();
@@ -181,11 +180,23 @@ describe("Ranking", () => {
     for (const player of PLAYERS) {
       expect(within(section).getByText(new RegExp(player.name))).toBeTruthy();
     }
-    // The Port Royal case: the answer gives the same reason, and names no Player.
+    // The short course case: the answer gives the same reason, and names no Player.
     const answerText = answer().textContent ?? "";
     expect(answerText).toMatch(/nothing separates the players/i);
     expect(answerText).toMatch(blockingSentence);
     for (const player of PLAYERS) expect(answerText).not.toContain(player.name);
+  });
+
+  it("renders a ranking for Port Royal at 6,842 yards, the shortest Tour course", () => {
+    // Port Royal's yardage is now above the floor of 6,500, so it can separate Players.
+    render(<Ranking players={PLAYERS} traits={{ length_yards: 6_842 }} hasVenue={false} />);
+
+    // A ranking table should render with ranked rows.
+    expect(screen.queryByRole("table")).toBeTruthy();
+    // The first ranked row should have rank number 1.
+    const headers = within(screen.getByRole("table")).getAllByRole("rowheader");
+    expect(headers.length).toBeGreaterThan(0);
+    expect(headers[0]?.textContent).toContain("1");
   });
 
   it("says the Course has no known Fit Trait, not that the Players lack a record, when none is known", () => {
@@ -212,7 +223,7 @@ describe("Ranking", () => {
     render(
       <Ranking
         players={PLAYERS}
-        traits={{ length_yards: 6_800, slope_rating_gap: 70 }}
+        traits={{ length_yards: 6_400, slope_rating_gap: 70 }}
         hasVenue={false}
       />,
     );

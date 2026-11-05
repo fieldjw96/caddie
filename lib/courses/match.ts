@@ -7,6 +7,7 @@
 // refuses rather than guesses, and every refusal says why, so a person can decide.
 
 import type { CourseMatch } from "../../db/schema";
+import { TOUR_MINIMUM_YARDAGE } from "../tour-constants";
 
 /** Two-letter codes, as OpenGolfAPI's `state` field writes them, by the schedule's name. */
 const US_STATES: Record<string, string> = {
@@ -417,13 +418,6 @@ export function matchDeclared(
 
 /** The par a Tour course is played at, from a par-3 heavy 68 to a par-5 heavy 73. */
 const TOUR_PAR = { min: 68, max: 73 };
-
-/**
- * No course the Tour plays is shorter than this: the shortest, such as Harbour Town, are
- * around 7,100 yards from the back. This sits well below them, so it catches only a record
- * that is of something else, not a short course.
- */
-const TOUR_MINIMUM_YARDAGE = 6_500;
 
 /**
  * Why a matched course's record cannot be the course a Tournament is played on, or null if
