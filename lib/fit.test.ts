@@ -109,7 +109,7 @@ const SUITING: FitCourseTraits = {
 };
 // A short, gentle par 70: asks the least of every Trait.
 const NOT_SUITING: FitCourseTraits = {
-  length_yards: 6_900,
+  length_yards: 6_500,
   slope_rating_gap: 60,
   mean_par_4_yards: 400,
   longest_par_4_yards: 460,
@@ -172,12 +172,12 @@ describe("fitScore", () => {
   });
 
   it("breaks out every Trait's working so the page need not recompute it", () => {
-    const fit = fitScore({ ...SUITING, length_yards: 7_350 }, STRONG);
+    const fit = fitScore({ ...SUITING, length_yards: 7_150 }, STRONG);
     const length = fit.components.find((c) => c.trait === "length_yards")!;
     expect(length).toEqual({
       trait: "length_yards",
-      traitValue: 7_350,
-      range: { min: 6_900, max: 7_800 },
+      traitValue: 7_150,
+      range: { min: 6_500, max: 7_800 },
       normalised: 0.5,
       weight: 0.3,
       strength: "skill",
@@ -238,7 +238,7 @@ describe("fitScore", () => {
     }
     expect(fit.knownWeight).toBeCloseTo(0.55, 12);
     expect(fit.score).toBeCloseTo(
-      0.3 * ((7_445 - 6_900) / 900) * 0.6 + 0.25 * ((71.8 - 60) / 20) * 0.5,
+      0.3 * ((7_445 - 6_500) / 1_300) * 0.6 + 0.25 * ((71.8 - 60) / 20) * 0.5,
       12,
     );
     // A null Trait is the same as an absent one.
@@ -272,8 +272,8 @@ describe("fitScore", () => {
 });
 
 describe("a Course that asks nothing that separates Players", () => {
-  // Port Royal, whose only known Trait falls below the bottom of its range.
-  const SHORT: FitCourseTraits = { length_yards: 6_800 };
+  // A course shorter than any Tour course, to test that very short courses give a null score.
+  const SHORT: FitCourseTraits = { length_yards: 6_400 };
 
   it("gives a null score even for a Player with every Strength known", () => {
     const fit = fitScore(SHORT, STRONG);
@@ -304,6 +304,26 @@ describe("a Course that asks nothing that separates Players", () => {
     expect(fit.score).toBeNull();
     expect(fit.demand).toBe(0);
     expect(fit.totalWeight).toBe(0);
+  });
+});
+
+describe("Port Royal at 6,842 yards", () => {
+  // Port Royal, the shortest Tour course, now sits above the floor of 6,500 and can separate Players.
+  const portRoyal: FitCourseTraits = { length_yards: 6_842 };
+
+  it("gives a non-null score for a Player with the known Strength", () => {
+    const fit = fitScore(portRoyal, STRONG);
+    expect(fit.score).not.toBeNull();
+    const length = fit.components.find((c) => c.trait === "length_yards")!;
+    expect(length.normalised).toBeGreaterThan(0);
+    expect(length.contribution).not.toBe(0);
+  });
+
+  it("computes the normalised value correctly for Port Royal's yardage", () => {
+    const fit = fitScore(portRoyal, STRONG);
+    const length = fit.components.find((c) => c.trait === "length_yards")!;
+    // 6,842 is 342 yards above the floor of 6,500, out of a 1,300 yard range.
+    expect(length.normalised).toBeCloseTo(342 / 1_300, 12);
   });
 });
 

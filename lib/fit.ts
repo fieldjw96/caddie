@@ -1,3 +1,5 @@
+import { TOUR_MINIMUM_YARDAGE } from "./tour-constants";
+
 /**
  * THE FIT SCORE
  *
@@ -124,9 +126,9 @@ export interface TraitScale {
  * Courses play at from their championship tees, so almost every Course lands inside them.
  */
 export const TRAIT_SCALES: Readonly<Record<FitTraitName, TraitScale>> = {
-  // From a short tour course, about 6,900 yards, to the longest, about 7,800.
+  // From Port Royal, about 6,840 yards, the shortest Tour course, to the longest, about 7,800.
   length_yards: {
-    min: 6_900,
+    min: TOUR_MINIMUM_YARDAGE,
     max: 7_800,
     calls: "skill",
     why: "Every approach is a longer club, so a lapse costs more and class tells.",
