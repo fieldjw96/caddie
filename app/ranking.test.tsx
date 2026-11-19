@@ -390,14 +390,16 @@ describe("Ranking", () => {
     render(<Ranking players={players} traits={fitTraits(TRUSTED_TRAITS)} hasVenue={false} />);
 
     const main = rankingTable();
-    const mainRows = [...main.querySelectorAll("tbody tr")];
+    const mainRows = [...main.querySelectorAll<HTMLTableRowElement>("tbody tr")];
     expect(mainRows).toHaveLength(1);
     expect(mainRows[0]?.getAttribute("data-player")).toBe("Vic Vale");
     expect(mainRows[0]?.cells[0]?.textContent?.trim()).toBe("1");
     // Ward, whose raw score is the highest of the three, is in the group beneath with no
     // number: a partial score does not take the top of an order it is not in.
     const partialRows = [
-      ...within(partialSection()).getByRole("table").querySelectorAll("tbody tr"),
+      ...within(partialSection())
+        .getByRole("table")
+        .querySelectorAll<HTMLTableRowElement>("tbody tr"),
     ];
     expect(partialRows.map((r) => r.getAttribute("data-player"))).toEqual([
       "Wes Ward",
