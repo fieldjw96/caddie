@@ -66,7 +66,10 @@ import { TOUR_MINIMUM_YARDAGE } from "./tour-constants";
  * Strength means "we do not have the record to say". So a null Strength, or a Trait the Course
  * lacks (for instance because its hole-by-hole data failed the check in lib/course-traits.ts),
  * produces a null contribution, which adds nothing either way and is shown as unknown. The
- * result carries how much of the Weighting it rests on, so the page can say so. A Player with
+ * result carries how much of the Weighting it rests on, so the page can say so. Because adding
+ * nothing pulls a partial score towards zero, only the Players resting on the whole Weighting
+ * are ranked against each other: `rankFits` groups the rest beneath, with their share stated,
+ * rather than ordering scores that are not measuring the same thing. A Player with
  * no known contribution at all gets a null Fit Score, not a zero, and `rankFits` puts them in
  * a group of their own rather than at the bottom. The same holds when every known contribution
  * is zero because the Course asks nothing of it, as a short Course does of length: nothing
@@ -308,22 +311,67 @@ export function fitScore(
   return { score: separates ? sum : null, components, totalWeight, knownWeight, demand };
 }
 
+/** One Player and their Fit Score, where that score is known to be a number. */
+export type ScoredFit<P> = { player: P; fit: FitScore & { score: number } };
+
 export interface RankedFits<P> {
-  /** Players with a Fit Score, highest first. Ties keep the order they were given in. */
-  scored: { player: P; fit: FitScore & { score: number } }[];
+  /**
+   * Players whose Fit Score rests on the whole Weighting, highest first. Ties keep the order
+   * they were given in. These are the only Players ranked against each other, because these
+   * are the only ones whose scores are measured on the same thing.
+   */
+  scored: ScoredFit<P>[];
+  /**
+   * Players with a Fit Score resting on part of the Weighting, highest first among themselves.
+   * Not ranked against the group above, and not rescaled to make them comparable either.
+   */
+  partial: ScoredFit<P>[];
   /** Players with no Fit Score: not ranked, because unknown is not last. */
   unscored: { player: P; fit: FitScore }[];
 }
 
-/** Splits Players into those with a Fit Score, ranked, and those without one. */
+/**
+ * The one comparison both scored groups are ordered by: the Fit Score as it stands, highest
+ * first. Array.prototype.sort is stable, so ties keep the order they were given in.
+ */
+const byScoreDescending = <P>(a: ScoredFit<P>, b: ScoredFit<P>) => b.fit.score - a.fit.score;
+
+/**
+ * Splits Players into three groups: those whose Fit Score rests on the whole Weighting, ranked;
+ * those whose Fit Score rests on part of it, ordered among themselves; and those with no Fit
+ * Score at all.
+ *
+ * Why the middle group is apart rather than mixed in. An unknown contribution adds nothing
+ * rather than being left out of the sum, which is the honest arithmetic but pulls a partial
+ * score towards zero: a Player we know less about who is below the middle of the field reads
+ * better than an equally below-average Player we know more about, and one above the middle
+ * reads worse for having a fuller record. Two scores resting on different amounts of the
+ * Weighting are not measuring the same thing, so putting a number against both of them in one
+ * order would be a claim this module cannot support.
+ *
+ * Why not rescale them instead. Dividing by `knownWeight` would make the numbers look
+ * comparable at the cost of the promise stated at the top of this file: that the arithmetic
+ * never rescales the reader's Weightings behind their back, so raising a Weighting always moves
+ * the score the way the reader would expect. The scores here are the unscaled sums, untouched;
+ * the page states the share each rests on and leaves the comparison to the reader.
+ */
 export function rankFits<P>(entries: readonly { player: P; fit: FitScore }[]): RankedFits<P> {
-  const scored: RankedFits<P>["scored"] = [];
+  const scored: ScoredFit<P>[] = [];
+  const partial: ScoredFit<P>[] = [];
   const unscored: RankedFits<P>["unscored"] = [];
   for (const { player, fit } of entries) {
     const { score } = fit;
     if (score === null) unscored.push({ player, fit });
-    else scored.push({ player, fit: { ...fit, score } });
+    // Exact equality is right here, not a tolerance: `knownWeight` is a subset of the very
+    // addends of `totalWeight`, summed in the same order, so the two agree bit for bit when
+    // every unknown contribution carries a Weighting of zero, or one so slight that adding it
+    // to the total changed nothing — which is the same claim the row's own share makes when it
+    // prints 100%.
+    else if (fit.knownWeight === fit.totalWeight)
+      scored.push({ player, fit: { ...fit, score } });
+    else partial.push({ player, fit: { ...fit, score } });
   }
-  scored.sort((a, b) => b.fit.score - a.fit.score);
-  return { scored, unscored };
+  scored.sort(byScoreDescending);
+  partial.sort(byScoreDescending);
+  return { scored, partial, unscored };
 }
