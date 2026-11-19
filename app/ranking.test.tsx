@@ -428,9 +428,10 @@ describe("Ranking", () => {
     expect(scoreOf("Alex Adams")).toMatch(/\+0\.\d{3}/);
     expect(scoreOf("Alex Adams")).toContain("on 55% of the Weighting");
     expect(scoreOf("Casey Clark")).toContain("on 100% of the Weighting");
-    // It is the share that is stated, not a rescaled score: 0.077 is the unscaled sum, where
-    // dividing by 0.55 would have read 0.140.
-    expect(scoreOf("Alex Adams")).toContain("+0.077");
+    // It is the share that is stated, not a rescaled score: 0.076 is the unscaled sum over
+    // Adams's three known Traits, weighed on Bay Hill's altitude-adjusted 7,450 yards, where
+    // dividing by 0.55 would have read 0.138.
+    expect(scoreOf("Alex Adams")).toContain("+0.076");
   });
 
   it("lists every Player with a Fit Score beneath, and no empty ranking, when none rests on the whole Weighting", () => {
