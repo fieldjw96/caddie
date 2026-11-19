@@ -63,7 +63,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
   // Everything the walk needs, in three queries however many candidates it examines: the
   // Courses once, every Course's Trait count in one grouped query, and whether a Strength
   // exists at all. A per-candidate query here would make a thin autumn swing expensive.
-  const [allCourses, traitCountRows, strengthRow] = await Promise.all([
+  const [allCourses, traitCountRows, strengthProbe] = await Promise.all([
     db.select().from(courses),
     db
       .select({ courseId: courseTraits.courseId, traits: count() })
@@ -79,7 +79,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
     upcoming,
     allCourses,
     new Map(traitCountRows.map((r) => [r.courseId, r.traits])),
-    strengthRow.length > 0,
+    strengthProbe.length > 0,
   );
   // `upcoming` is not empty, so the walk always answers with one of its Tournaments; this is
   // the type's null case, not a state reachable from here.

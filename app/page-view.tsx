@@ -244,8 +244,8 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
                 : `This is not the soonest Tournament: ${skipped.length} were skipped.`}
             </h2>
             <p className="mt-1">
-              {tournament.name} is the soonest one we can rank. Each Tournament below comes
-              first on the schedule and could not be ranked, for the reason given:
+              {tournament.name} is the soonest one we can rank. Every Tournament listed below
+              comes sooner on the schedule and could not be ranked, for the reason given:
             </p>
             <ul className="mt-2 space-y-1.5">
               {skipped.map((s) => (
