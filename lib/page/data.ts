@@ -156,11 +156,20 @@ export function matchCourse<C extends { id: number; name: string }>(
   return matches.length === 1 ? matches[0]! : null;
 }
 
-/** The Course Traits the Fit Score weighs, as the pure `fitScore` wants them. */
+/**
+ * The Course Traits the Fit Score weighs, as the pure `fitScore` wants them. `length_yards`
+ * is read from the stored `altitude_adjusted_length_yards` Trait where one is present, and
+ * from `length_yards` where it is not, so the Fit Score weighs the same number the Course
+ * Profile states as the Course's effective length rather than its raw published total. A
+ * Course with no stored altitude is weighed on its raw total rather than refused: see
+ * lib/course-traits.ts for where the adjusted Trait is derived, and docs/adr/0005 for why
+ * altitude is read only where a Source holds it.
+ */
 export function fitTraits(traits: StoredTraits): FitCourseTraits {
   const pick = (name: FitTraitName) => traits[name]?.value ?? null;
+  const adjustedLength = traits.altitude_adjusted_length_yards?.value ?? null;
   return {
-    length_yards: pick("length_yards"),
+    length_yards: adjustedLength ?? pick("length_yards"),
     slope_rating_gap: pick("slope_rating_gap"),
     mean_par_4_yards: pick("mean_par_4_yards"),
     longest_par_4_yards: pick("longest_par_4_yards"),
