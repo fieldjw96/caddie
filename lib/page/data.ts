@@ -124,8 +124,24 @@ export function classifyCoverageEditions(rows: readonly CoverageEditionRow[]): {
   return { leaderboardEvents, standingsEvents };
 }
 
+/**
+ * One Tournament the page stepped over to reach the one it ranks: its name, the reason
+ * `checkRankable` refused it, and the schedule revision that Tournament was read from. The
+ * page names every one of these, because a page that quietly substituted a different
+ * Tournament would be worse than the blank one it replaces.
+ */
+export interface SkippedTournamentView {
+  name: string;
+  /** Verbatim from `checkRankable`, which this repo does not reword for the page. */
+  reason: string;
+  sourceUrl: string | null;
+}
+
 export interface PageData {
+  /** The Tournament the page ranks: the soonest one that could be, not always the soonest. */
   tournament: TournamentView;
+  /** The Tournaments skipped to reach it, in schedule order. Empty when none was. */
+  skipped: SkippedTournamentView[];
   course: CourseView | null;
   traits: StoredTraits;
   players: PlayerView[];

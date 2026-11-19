@@ -29,6 +29,7 @@ const DATA: PageData = {
     courseName: "Bay Hill Club and Lodge",
     sourceUrl: "https://en.wikipedia.org/w/index.php?title=2027_PGA_Tour&oldid=1",
   },
+  skipped: [],
   course: TRUSTED_COURSE,
   traits: TRUSTED_TRAITS,
   players: PLAYERS,
