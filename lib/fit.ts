@@ -364,7 +364,9 @@ export function rankFits<P>(entries: readonly { player: P; fit: FitScore }[]): R
     if (score === null) unscored.push({ player, fit });
     // Exact equality is right here, not a tolerance: `knownWeight` is a subset of the very
     // addends of `totalWeight`, summed in the same order, so the two agree bit for bit when
-    // every unknown contribution carries a Weighting of zero, and differ otherwise.
+    // every unknown contribution carries a Weighting of zero, or one so slight that adding it
+    // to the total changed nothing — which is the same claim the row's own share makes when it
+    // prints 100%.
     else if (fit.knownWeight === fit.totalWeight)
       scored.push({ player, fit: { ...fit, score } });
     else partial.push({ player, fit: { ...fit, score } });

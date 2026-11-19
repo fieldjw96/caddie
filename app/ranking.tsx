@@ -500,8 +500,8 @@ export function Ranking({
             contribution adds nothing rather than being left out, which pulls the score towards
             zero, so it cannot be set against a score resting on the whole Weighting without
             flattering the thinner record. We do not rescale it to make the numbers look
-            comparable, because that would change what a Weighting does. The score is the same
-            arithmetic as above; the share it rests on is printed beneath it.
+            comparable, because that would change what a Weighting does. Each score below is
+            the same arithmetic the ranking uses, with the share it rests on beneath it.
           </p>
           <FitTable rows={ranked.partial} hasVenue={hasVenue} numbered={false} />
         </section>

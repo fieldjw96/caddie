@@ -405,7 +405,12 @@ describe("Ranking", () => {
     ]);
     // Every one of their first cells is the Player's own row header, not a rank.
     for (const r of partialRows) expect(r.cells[0]?.tagName).toBe("TH");
-    expect(document.querySelectorAll("tbody td.text-center")).toHaveLength(1);
+    // And exactly one row on the whole page is numbered: one with a cell before its header.
+    const numbered = [...document.querySelectorAll<HTMLTableRowElement>("tbody tr")].filter(
+      (r) => r.cells[0]?.tagName === "TD",
+    );
+    expect(numbered).toHaveLength(1);
+    expect(numbered[0]?.getAttribute("data-player")).toBe("Vic Vale");
   });
 
   it("says why the group beneath is listed apart, and prints each row's Fit Score and share", () => {
