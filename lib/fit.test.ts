@@ -13,6 +13,25 @@ import {
   type FitTraitName,
   type Weightings,
 } from "./fit";
+import { TOUR_MINIMUM_YARDAGE } from "./tour-constants";
+
+// Issue #152 reads the existing length_yards Trait from a better number; it does not add a
+// sixth Trait, change its scale, or touch its Weighting. These pin that it did not.
+describe("the Length Trait, unchanged by weighing the altitude-adjusted value (issue #152)", () => {
+  it("FitTraitName still lists exactly five Traits", () => {
+    expect(FIT_TRAITS).toHaveLength(5);
+  });
+
+  it("TRAIT_SCALES.length_yards keeps its range and still calls Skill", () => {
+    expect(TRAIT_SCALES.length_yards.min).toBe(TOUR_MINIMUM_YARDAGE);
+    expect(TRAIT_SCALES.length_yards.max).toBe(7_800);
+    expect(TRAIT_SCALES.length_yards.calls).toBe("skill");
+  });
+
+  it("DEFAULT_WEIGHTINGS.length_yards is still 0.3", () => {
+    expect(DEFAULT_WEIGHTINGS.length_yards).toBe(0.3);
+  });
+});
 
 describe("normalise", () => {
   it("places a value within its range", () => {
