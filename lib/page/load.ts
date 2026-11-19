@@ -1,13 +1,14 @@
-// Reads what the page shows out of Postgres, and nothing else. Which Tournament is next is
-// decided by the pure `nextTournament`, handed every stored Tournament, rather than by a query
-// that would reimplement it; everything else is shaped by lib/page/data.ts.
+// Reads what the page shows out of Postgres, and nothing else. Which Tournament the page is
+// about is decided by the pure `upcomingTournaments` and `chooseRankableTournament`, handed
+// every stored Tournament, rather than by a query that would reimplement either; everything
+// else is shaped by lib/page/data.ts.
 //
 // The database client is imported inside the function rather than at the top: db/client.ts
 // refuses to load without DATABASE_URL, and `next build` loads this module while collecting
 // routes, when no database is there to talk to.
 
 import "server-only";
-import { eq, inArray, max } from "drizzle-orm";
+import { count, eq, inArray, isNotNull, max } from "drizzle-orm";
 import {
   courses,
   courseTraits,
@@ -18,8 +19,9 @@ import {
   type CourseTee,
 } from "../../db/schema";
 import { selectRoster } from "../roster";
-import { nextTournament } from "../schedule/next-tournament";
+import { upcomingTournaments } from "../schedule/next-tournament";
 import { strengthKey } from "../strengths/store";
+import { chooseRankableTournament } from "./choose-tournament";
 import {
   classifyCoverageEditions,
   matchCourse,
@@ -34,7 +36,11 @@ function championshipTee(tees: CourseTee[] | null, published: number | null) {
   return tee ? { name: tee.name, slope: tee.slope, rating: tee.rating } : null;
 }
 
-/** Everything the page shows, or null when no Tournament is scheduled from `now` onwards. */
+/**
+ * Everything the page shows, or null when no Tournament is scheduled from `now` onwards. The
+ * Tournament is the soonest one that can actually be ranked, with the ones skipped to reach it
+ * named in `skipped`; see lib/page/choose-tournament.ts.
+ */
 export async function loadPageData(now: Date): Promise<PageData | null> {
   const { db } = await import("../../db/client");
   const asOf = now.toISOString().slice(0, 10);
@@ -51,10 +57,34 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
       sourceUrl: tournaments.sourceUrl,
     })
     .from(tournaments);
-  const next = nextTournament(schedule, now);
+  const upcoming = upcomingTournaments(schedule, now);
+  if (upcoming.length === 0) return null;
+
+  // Everything the walk needs, in three queries however many candidates it examines: the
+  // Courses once, every Course's Trait count in one grouped query, and whether a Strength
+  // exists at all. A per-candidate query here would make a thin autumn swing expensive.
+  const [allCourses, traitCountRows, strengthRow] = await Promise.all([
+    db.select().from(courses),
+    db
+      .select({ courseId: courseTraits.courseId, traits: count() })
+      .from(courseTraits)
+      .groupBy(courseTraits.courseId),
+    db
+      .select({ playerId: playerStrengths.playerId })
+      .from(playerStrengths)
+      .where(isNotNull(playerStrengths.value))
+      .limit(1),
+  ]);
+  const { tournament: next, skipped } = chooseRankableTournament(
+    upcoming,
+    allCourses,
+    new Map(traitCountRows.map((r) => [r.courseId, r.traits])),
+    strengthRow.length > 0,
+  );
+  // `upcoming` is not empty, so the walk always answers with one of its Tournaments; this is
+  // the type's null case, not a state reachable from here.
   if (next === null) return null;
 
-  const allCourses = await db.select().from(courses);
   const courseRow = matchCourse(next, allCourses);
 
   const traitRows =
@@ -159,6 +189,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
       courseName: next.courseName,
       sourceUrl: next.sourceUrl,
     },
+    skipped,
     course,
     traits: Object.fromEntries(
       traitRows.map((t) => [t.trait, { value: t.value, unit: t.unit }]),
