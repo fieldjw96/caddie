@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { fitScore, normalise, TRAIT_SCALES } from "../fit";
 import {
   classifyCoverageEditions,
   courseProfile,
@@ -181,7 +182,11 @@ describe("courseProfile", () => {
 });
 
 describe("fitTraits", () => {
-  it("passes the weighed Traits and nulls for the ones the Course lacks", () => {
+  it("weighs the altitude-adjusted length where one is stored", () => {
+    expect(fitTraits(TRUSTED_TRAITS).length_yards).toBe(7450);
+  });
+
+  it("weighs the raw published total where no altitude adjustment is stored", () => {
     expect(fitTraits(UNTRUSTED_TRAITS)).toEqual({
       length_yards: 7555,
       slope_rating_gap: 60.8,
@@ -189,6 +194,49 @@ describe("fitTraits", () => {
       longest_par_4_yards: null,
       par_5_share: null,
     });
+  });
+
+  it("is null when neither Length Trait is stored", () => {
+    expect(fitTraits({}).length_yards).toBeNull();
+  });
+
+  it("reaches the Fit Score: an altitude adjustment changes the length_yards contribution, not just the picker", () => {
+    const noAltitudeTraits = Object.fromEntries(
+      Object.entries(TRUSTED_TRAITS).filter(
+        ([name]) => name !== "altitude_adjusted_length_yards",
+      ),
+    );
+    const strengths = { skill: 0.8 };
+    const adjusted = fitScore(fitTraits(TRUSTED_TRAITS), strengths).components.find(
+      (c) => c.trait === "length_yards",
+    )!;
+    const unadjusted = fitScore(fitTraits(noAltitudeTraits), strengths).components.find(
+      (c) => c.trait === "length_yards",
+    )!;
+    expect(adjusted.traitValue).toBe(7450);
+    expect(unadjusted.traitValue).toBe(7466);
+    expect(adjusted.contribution).not.toBeNull();
+    expect(adjusted.contribution).not.toBe(unadjusted.contribution);
+  });
+
+  it("weighs a Course with no stored altitude on its raw published total rather than refusing it", () => {
+    const fit = fitScore(fitTraits(UNTRUSTED_TRAITS), { skill: 0.8 });
+    const length = fit.components.find((c) => c.trait === "length_yards")!;
+    expect(length.traitValue).toBe(7555);
+    expect(length.contribution).not.toBeNull();
+    expect(fit.knownWeight).toBe(0.3);
+  });
+
+  it("agrees with the Weightings panel's demand figure for Length, for a Course with an altitude adjustment", () => {
+    // app/ranking.tsx's Weightings panel computes `normalise(traits[trait], scale.min, scale.max)`
+    // straight off the same `traits` object fitScore is handed below: this pins that both read
+    // the altitude-adjusted value, not the raw one.
+    const traits = fitTraits(TRUSTED_TRAITS);
+    const scale = TRAIT_SCALES.length_yards;
+    const demandShown = normalise(traits.length_yards!, scale.min, scale.max);
+    const length = fitScore(traits, {}).components.find((c) => c.trait === "length_yards")!;
+    expect(traits.length_yards).toBe(7450);
+    expect(length.normalised).toBe(demandShown);
   });
 });
 
