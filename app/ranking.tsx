@@ -19,6 +19,7 @@ import {
   type FitStrengthName,
   type FitTraitName,
   type RankedFits,
+  type ScoredFit,
   type Weightings,
 } from "../lib/fit";
 import { listInWords, type PlayerView, type StrengthView } from "../lib/page/data";
@@ -93,21 +94,27 @@ function ContributionCell({ component }: { component: FitComponent }) {
  * renders rather than worked out again. When nothing separates the Players it says so and
  * gives the same reason the ranking section does, naming no Player; otherwise it names the
  * top three by Fit Score and, for the leader, the Trait behind most of their score and the
- * Strength that Trait calls for.
+ * Strength that Trait calls for. It names only Players resting on the whole Weighting, because
+ * those are the only ones ranked: with a Fit Score on part of the Weighting, naming a leader
+ * would be putting a thinner record at the top of an order that does not exist.
  */
 function Answer({
   ranked,
   unscoredReason,
   courseOrWeightingsSentence,
+  partialOnlySentence,
 }: {
   ranked: RankedFits<PlayerView>;
   unscoredReason: "course" | "weightings" | "record";
   courseOrWeightingsSentence: React.ReactNode;
+  partialOnlySentence: React.ReactNode;
 }) {
   if (ranked.scored.length === 0) {
     return (
       <p data-testid="answer" className="max-w-prose text-lg">
-        {unscoredReason === "course" ? (
+        {ranked.partial.length > 0 ? (
+          partialOnlySentence
+        ) : unscoredReason === "course" ? (
           courseOrWeightingsSentence
         ) : unscoredReason === "weightings" ? (
           <>
@@ -174,6 +181,122 @@ function Answer({
   );
 }
 
+/**
+ * One group of Players with a Fit Score, with every Trait's working across the row. The same
+ * table serves the ranking and the Players resting on part of the Weighting, so a row reads the
+ * same in both; only the ranked group carries a rank number, because only those Players are
+ * ranked against each other.
+ */
+function FitTable({
+  rows,
+  hasVenue,
+  numbered,
+}: {
+  rows: readonly ScoredFit<PlayerView>[];
+  hasVenue: boolean;
+  numbered: boolean;
+}) {
+  // The Player column pins against the left edge, or just past the rank column where there is
+  // one, so it stays put as the row scrolls sideways.
+  const playerPin = numbered ? "sticky left-14" : "sticky left-0";
+  return (
+    <div className="mt-4 overflow-x-auto border-2 border-band sm:max-h-[36rem] sm:overflow-y-auto">
+      <table className="w-full min-w-[68rem] border-collapse text-[0.95rem]">
+        <thead className="sticky top-0 z-30 bg-band font-display text-base tracking-[0.06em] text-on-band uppercase">
+          <tr>
+            {numbered && (
+              <th
+                scope="col"
+                className="sticky left-0 z-20 w-14 bg-band px-2 py-2.5 text-center font-bold"
+              >
+                #
+              </th>
+            )}
+            <th
+              scope="col"
+              className={`${playerPin} z-20 min-w-[11rem] bg-band px-3 py-2.5 text-left font-bold`}
+            >
+              Player
+            </th>
+            <th scope="col" className="px-3 py-2.5 text-right font-bold">
+              Fit Score
+            </th>
+            <th scope="col" className="px-3 py-2.5 text-right font-bold">
+              Skill
+            </th>
+            <th scope="col" className="px-3 py-2.5 text-right font-bold">
+              Consistency
+            </th>
+            <th scope="col" className="px-3 py-2.5 text-right font-bold">
+              Low rounds
+            </th>
+            {FIT_TRAITS.map((t) => (
+              <th key={t} scope="col" className="px-3 py-2.5 text-right font-bold">
+                {TRAIT_LABELS[t]}
+              </th>
+            ))}
+            <th scope="col" className="px-3 py-2.5 text-right font-bold">
+              Form
+            </th>
+            {hasVenue && (
+              <th scope="col" className="px-3 py-2.5 text-right font-bold">
+                Record here
+              </th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ player, fit }, index) => (
+            <tr
+              key={player.id}
+              className="border-t border-rule odd:bg-paper even:bg-row-alt"
+              data-player={player.name}
+            >
+              {numbered && (
+                <td className="sticky left-0 z-10 w-14 bg-inherit px-2 py-2 text-center align-top">
+                  <span className="inline-block min-w-8 bg-band py-0.5 font-display text-xl font-bold text-on-band">
+                    {index + 1}
+                  </span>
+                </td>
+              )}
+              <th
+                scope="row"
+                className={`${playerPin} z-10 min-w-[11rem] bg-inherit px-3 py-2 text-left align-top`}
+              >
+                <span className="font-display text-xl font-bold uppercase">{player.name}</span>
+                {player.country && (
+                  <span className="block text-[0.8rem] font-normal text-muted">
+                    {player.country}
+                  </span>
+                )}
+              </th>
+              <td className="px-3 py-2 text-right align-top whitespace-nowrap">
+                <span
+                  className={`inline-block border border-rule-strong bg-paper px-2 font-display text-2xl font-bold ${tone(fit.score)}`}
+                >
+                  {signed(fit.score, 3)}
+                </span>
+                <span className="block text-xs text-muted">
+                  on {Math.round((fit.knownWeight / (fit.totalWeight || 1)) * 100)}% of the
+                  Weighting
+                </span>
+              </td>
+              <StrengthCell strength={player.skill} />
+              <StrengthCell strength={player.consistency} />
+              <StrengthCell strength={player.lowRounds} />
+              {fit.components.map((c) => (
+                <ContributionCell key={c.trait} component={c} />
+              ))}
+              <StrengthCell strength={player.form} />
+              {hasVenue && <StrengthCell strength={player.venueRecord} />}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 const subscribeNothing = () => () => {};
 
 /** The names and results counts of every unscored Player, collapsible past 40. */
@@ -224,7 +347,7 @@ export function Ranking({
   );
 
   const ranked = useMemo(() => {
-    const { scored, unscored } = rankFits(
+    const { scored, partial, unscored } = rankFits(
       players.map((player) => ({
         player,
         fit: fitScore(
@@ -240,6 +363,7 @@ export function Ranking({
     );
     return {
       scored,
+      partial,
       unscored: [...unscored].sort((a, b) => a.player.name.localeCompare(b.player.name, "en")),
     };
   }, [players, traits, deferred]);
@@ -297,6 +421,17 @@ export function Ranking({
       </>
     );
 
+  // What the ranking says when nobody rests on the whole Weighting: there are Fit Scores, so
+  // nothing here claims the Players cannot be separated, only that they are not put in an order.
+  // Shared with the answer above, so both give the same reason in the same words.
+  const partialOnlySentence = (
+    <>
+      No Player&rsquo;s Fit Score rests on the whole Weighting, so none of them is ranked.
+      Every Player with a Fit Score is listed below, each with the share of the Weighting it
+      rests on.
+    </>
+  );
+
   const changed = FIT_TRAITS.some((t) => weightings[t] !== DEFAULT_WEIGHTINGS[t]);
   const totalWeight = FIT_TRAITS.reduce((sum, t) => sum + weightings[t], 0);
 
@@ -306,6 +441,7 @@ export function Ranking({
         ranked={ranked}
         unscoredReason={unscoredReason}
         courseOrWeightingsSentence={courseOrWeightingsSentence}
+        partialOnlySentence={partialOnlySentence}
       />
       {children}
       <section aria-labelledby="ranking" className="mt-14">
@@ -330,106 +466,17 @@ export function Ranking({
 
         {ranked.scored.length === 0 ? (
           <p className="mt-4 border border-gap-rule bg-gap-panel p-3 text-sm">
-            {unscoredReason === "record"
-              ? "No Player has a Fit Score: no Player has enough results for a Strength this " +
-                "Course asks for."
-              : courseOrWeightingsSentence}
+            {ranked.partial.length > 0
+              ? partialOnlySentence
+              : unscoredReason === "record"
+                ? "No Player has a Fit Score: no Player has enough results for a Strength this " +
+                  "Course asks for."
+                : courseOrWeightingsSentence}
           </p>
         ) : (
-          <div className="mt-4 overflow-x-auto border-2 border-band sm:max-h-[36rem] sm:overflow-y-auto">
-            <table className="w-full min-w-[68rem] border-collapse text-[0.95rem]">
-              <thead className="sticky top-0 z-30 bg-band font-display text-base tracking-[0.06em] text-on-band uppercase">
-                <tr>
-                  <th
-                    scope="col"
-                    className="sticky left-0 z-20 w-14 bg-band px-2 py-2.5 text-center font-bold"
-                  >
-                    #
-                  </th>
-                  <th
-                    scope="col"
-                    className="sticky left-14 z-20 min-w-[11rem] bg-band px-3 py-2.5 text-left font-bold"
-                  >
-                    Player
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
-                    Fit Score
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
-                    Skill
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
-                    Consistency
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
-                    Low rounds
-                  </th>
-                  {FIT_TRAITS.map((t) => (
-                    <th key={t} scope="col" className="px-3 py-2.5 text-right font-bold">
-                      {TRAIT_LABELS[t]}
-                    </th>
-                  ))}
-                  <th scope="col" className="px-3 py-2.5 text-right font-bold">
-                    Form
-                  </th>
-                  {hasVenue && (
-                    <th scope="col" className="px-3 py-2.5 text-right font-bold">
-                      Record here
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {ranked.scored.map(({ player, fit }, index) => (
-                  <tr
-                    key={player.id}
-                    className="border-t border-rule odd:bg-paper even:bg-row-alt"
-                    data-player={player.name}
-                  >
-                    <td className="sticky left-0 z-10 w-14 bg-inherit px-2 py-2 text-center align-top">
-                      <span className="inline-block min-w-8 bg-band py-0.5 font-display text-xl font-bold text-on-band">
-                        {index + 1}
-                      </span>
-                    </td>
-                    <th
-                      scope="row"
-                      className="sticky left-14 z-10 min-w-[11rem] bg-inherit px-3 py-2 text-left align-top"
-                    >
-                      <span className="font-display text-xl font-bold uppercase">
-                        {player.name}
-                      </span>
-                      {player.country && (
-                        <span className="block text-[0.8rem] font-normal text-muted">
-                          {player.country}
-                        </span>
-                      )}
-                    </th>
-                    <td className="px-3 py-2 text-right align-top whitespace-nowrap">
-                      <span
-                        className={`inline-block border border-rule-strong bg-paper px-2 font-display text-2xl font-bold ${tone(fit.score)}`}
-                      >
-                        {signed(fit.score, 3)}
-                      </span>
-                      <span className="block text-xs text-muted">
-                        on {Math.round((fit.knownWeight / (fit.totalWeight || 1)) * 100)}% of
-                        the Weighting
-                      </span>
-                    </td>
-                    <StrengthCell strength={player.skill} />
-                    <StrengthCell strength={player.consistency} />
-                    <StrengthCell strength={player.lowRounds} />
-                    {fit.components.map((c) => (
-                      <ContributionCell key={c.trait} component={c} />
-                    ))}
-                    <StrengthCell strength={player.form} />
-                    {hasVenue && <StrengthCell strength={player.venueRecord} />}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <FitTable rows={ranked.scored} hasVenue={hasVenue} numbered={true} />
         )}
-        {ranked.scored.length > 0 && (
+        {(ranked.scored.length > 0 || ranked.partial.length > 0) && (
           <p className="mt-2 max-w-prose text-xs text-muted">
             {hasVenue
               ? "Form is Skill’s measure over the last six months, and Record here the same over a Player’s results at this Course. Both say how well a Player has done, not whose game suits this Course, so they are shown beside the Fit Score, not counted in it."
@@ -437,6 +484,28 @@ export function Ranking({
           </p>
         )}
       </section>
+
+      {ranked.partial.length > 0 && (
+        <section aria-labelledby="partial-weighting" className="mt-14">
+          <h2 id="partial-weighting" className={SECTION_HEADING}>
+            Not ranked: {ranked.partial.length === 1 ? "a Fit Score" : "Fit Scores"} resting on
+            part of the Weighting
+          </h2>
+          <p className="mt-2 max-w-prose text-sm text-muted">
+            {ranked.partial.length === 1
+              ? "This Player has"
+              : `These ${ranked.partial.length} Players have`}{" "}
+            a Fit Score, but not on every Trait: a Strength one of the Weightings calls for is
+            missing from their record, or this Course has no value for the Trait. An unknown
+            contribution adds nothing rather than being left out, which pulls the score towards
+            zero, so it cannot be set against a score resting on the whole Weighting without
+            flattering the thinner record. We do not rescale it to make the numbers look
+            comparable, because that would change what a Weighting does. The score is the same
+            arithmetic as above; the share it rests on is printed beneath it.
+          </p>
+          <FitTable rows={ranked.partial} hasVenue={hasVenue} numbered={false} />
+        </section>
+      )}
 
       <section aria-labelledby="weightings" className="mt-14">
         <h2 id="weightings" className={SECTION_HEADING}>
