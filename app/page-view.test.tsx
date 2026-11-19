@@ -158,10 +158,13 @@ describe("PageView, rendered on the server", () => {
 
   // The Ticket this fixture exists for: with no Course there are no Traits, with no Traits no
   // Fit Score, and the ranking renders nothing at all. Two course-level Traits are enough.
-  it("ranks the field on a Course created from the Tournament's own article", () => {
+  // Only Length is a Fit Trait, so every Fit Score here rests on part of the Weighting and the
+  // Players are listed in the group beneath rather than ranked: rows either way.
+  it("scores the field on a Course created from the Tournament's own article", () => {
     const h = html(FROM_ARTICLE);
     expect(h).toMatch(/<tr\b[^>]*\bdata-player="Casey Clark"/);
     expect([...h.matchAll(/<tr\b[^>]*\bdata-player="/g)]).toHaveLength(3);
+    expect(text(FROM_ARTICLE)).toContain("resting on part of the Weighting");
 
     const t = text(FROM_ARTICLE);
     expect(t).toContain("7,315 yards");
