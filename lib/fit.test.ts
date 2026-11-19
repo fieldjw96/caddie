@@ -339,7 +339,96 @@ describe("rankFits", () => {
     ];
     const ranked = rankFits(players);
     expect(ranked.scored.map((r) => r.player)).toEqual(["strong", "weak"]);
+    expect(ranked.partial).toEqual([]);
     expect(ranked.unscored.map((r) => r.player)).toEqual(["unknown"]);
+  });
+
+  it("ranks only the Players resting on the whole Weighting, and groups the partial beneath", () => {
+    // Four Players at a Course that asks the most of every Trait. Two rest on all of the
+    // Weighting; two have no Consistency and no Low rounds, so theirs rests on 0.55 of it.
+    const partialStrengths = (skill: number): FitPlayerStrengths => ({
+      skill,
+      consistency: null,
+      low_rounds: null,
+    });
+    const entries = [
+      { player: "partial-weak", fit: fitScore(SUITING, partialStrengths(0.3)) },
+      {
+        player: "full-weak",
+        fit: fitScore(SUITING, { skill: 0.3, consistency: 0.3, low_rounds: 0.3 }),
+      },
+      { player: "partial-strong", fit: fitScore(SUITING, partialStrengths(0.8)) },
+      { player: "full-strong", fit: fitScore(SUITING, STRONG) },
+      { player: "unknown", fit: fitScore(SUITING, {}) },
+    ];
+    const ranked = rankFits(entries);
+
+    expect(ranked.scored.map((r) => r.player)).toEqual(["full-strong", "full-weak"]);
+    expect(ranked.partial.map((r) => r.player)).toEqual(["partial-strong", "partial-weak"]);
+    expect(ranked.unscored.map((r) => r.player)).toEqual(["unknown"]);
+    // No partial entry reaches the ranked group, whatever its raw score. This is the point,
+    // and these four are the pathology itself: partial-weak has exactly full-weak's Skill and
+    // nothing else, yet scores -0.22 against full-weak's -0.40; partial-strong has exactly
+    // full-strong's Skill, yet scores 0.33 against full-strong's 0.555. A single order by score
+    // would have interleaved the groups and read those gaps as fit.
+    for (const { fit } of ranked.scored) expect(fit.knownWeight).toBe(fit.totalWeight);
+    for (const { fit } of ranked.partial)
+      expect(fit.knownWeight).toBeLessThan(fit.totalWeight);
+    expect(ranked.partial.map((r) => r.player)).not.toContain("full-weak");
+    expect(ranked.scored.map((r) => r.player)).not.toContain("partial-weak");
+    expect(ranked.scored.map((r) => r.player)).not.toContain("partial-strong");
+    // And the two groups really do straddle each other on the raw number, so this is not a
+    // case the old single sort happened to order the same way.
+    expect(ranked.partial[0]!.fit.score).toBeLessThan(ranked.scored[0]!.fit.score);
+    expect(ranked.partial[1]!.fit.score).toBeGreaterThan(ranked.scored[1]!.fit.score);
+  });
+
+  it("counts a Player as resting on the whole Weighting when every Trait it counts is known", () => {
+    // Low rounds is unknown, but par 5 share, the only Trait that calls for it, is weighted
+    // zero: nothing the current Weightings count is missing, so this Player is ranked.
+    const noPar5: Weightings = { ...DEFAULT_WEIGHTINGS, par_5_share: 0 };
+    const fit = fitScore(SUITING, { skill: 0.8, consistency: 0.75, low_rounds: null }, noPar5);
+    expect(fit.knownWeight).toBe(fit.totalWeight);
+    const ranked = rankFits([{ player: "p", fit }]);
+    expect(ranked.scored.map((r) => r.player)).toEqual(["p"]);
+    expect(ranked.partial).toEqual([]);
+  });
+
+  it("keeps the given order within a group when two scores tie", () => {
+    const same: FitPlayerStrengths = { skill: 0.6, consistency: null, low_rounds: null };
+    const ranked = rankFits([
+      { player: "first", fit: fitScore(SUITING, same) },
+      { player: "second", fit: fitScore(SUITING, same) },
+    ]);
+    expect(ranked.partial.map((r) => r.player)).toEqual(["first", "second"]);
+  });
+
+  it("never rescales a partial score: the score is the unscaled sum, as it was", () => {
+    // The Skill-only case pinned above at knownWeight 0.55. The score is the sum of the known
+    // contributions and nothing else: not divided by knownWeight, not stretched to totalWeight.
+    const fit = fitScore(SUITING, { skill: 0.8, consistency: null, low_rounds: null });
+    expect(fit.knownWeight).toBeCloseTo(0.55, 12);
+    expect(fit.totalWeight).toBeCloseTo(1, 12);
+    expect(fit.score).toBeCloseTo(0.55 * 0.6, 12);
+    const sum = fit.components.reduce((s, c) => s + (c.contribution ?? 0), 0);
+    expect(fit.score).toBeCloseTo(sum, 12);
+    // Grouping does not touch it either: the score in the group is the score fitScore returned.
+    const ranked = rankFits([{ player: "p", fit }]);
+    expect(ranked.partial[0]!.fit.score).toBe(fit.score);
+    expect(ranked.partial[0]!.fit.knownWeight).toBe(fit.knownWeight);
+    expect(ranked.partial[0]!.fit.totalWeight).toBe(fit.totalWeight);
+    // What rescaling would have given, for contrast: nothing in this module produces it.
+    expect(fit.score).not.toBeCloseTo((0.55 * 0.6) / 0.55, 6);
+  });
+
+  it("divides by knownWeight nowhere in the module", () => {
+    const source = readFileSync(resolve(__dirname, "fit.ts"), "utf8");
+    // Every line that could be a division, with the comment prose stripped out first so a
+    // sentence about not dividing cannot trip it.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+    expect(code).toMatch(/knownWeight/);
+    expect(code).not.toMatch(/knownWeight\s*\/[^/]/);
+    expect(code).not.toMatch(/\/\s*knownWeight/);
   });
 });
 
