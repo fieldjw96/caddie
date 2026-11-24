@@ -1,8 +1,9 @@
 # Caddie
 
-A public site that answers one question: of the players in the next tournament's field, whose
-game best suits that course, and why. Everything else on the site exists to make that answer
-readable and to show the working.
+A public site that answers one question: of the players in the field of the soonest tournament
+it can rank, whose game best suits that course, and why. Everything else on the site exists to
+make that answer readable and to show the working — including naming any Tournament it had to
+skip to have an answer at all.
 
 ## Language
 

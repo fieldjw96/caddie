@@ -2,7 +2,8 @@
 
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { PageData } from "../lib/page/data";
+import { checkRankable } from "../lib/ingest/rankable";
+import type { PageData, SkippedTournamentView } from "../lib/page/data";
 import {
   ARTICLE_COURSE,
   ARTICLE_TRAITS,
@@ -26,6 +27,7 @@ const DATA: PageData = {
     courseName: "Bay Hill Club and Lodge",
     sourceUrl: "https://en.wikipedia.org/w/index.php?title=2027_PGA_Tour&oldid=1",
   },
+  skipped: [],
   course: TRUSTED_COURSE,
   traits: TRUSTED_TRAITS,
   players: PLAYERS,
@@ -57,6 +59,36 @@ const FROM_ARTICLE: PageData = {
 
 const html = (data: PageData | null, now: Date = NOW) =>
   renderToString(<PageView data={data} now={now} />);
+
+/**
+ * One skipped Tournament as lib/page/choose-tournament.ts records it, carrying the reason
+ * `checkRankable` itself gave rather than a reworded copy of it: this is what the page has to
+ * print, so the test asks the real function for it.
+ */
+function skippedFixture(
+  next: { name: string; courseName: string | null; courseId: number | null },
+  sourceUrl: string | null,
+): SkippedTournamentView {
+  const result = checkRankable({ next, courseTraitCount: 0, anyPlayerHasStrength: true });
+  if (result.ok) throw new Error(`${next.name} must be one \`checkRankable\` refuses`);
+  return { name: next.name, reason: result.reason, sourceUrl };
+}
+
+/** The Austin Championship, whose Wikipedia article is a red link, so it has no venue. */
+const SKIPPED_AUSTIN = skippedFixture(
+  { name: "Austin Championship", courseName: null, courseId: null },
+  "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=2#Austin",
+);
+
+/** The Butterfield Bermuda Championship, whose matched Course has no Course Trait. */
+const SKIPPED_BERMUDA = skippedFixture(
+  {
+    name: "Butterfield Bermuda Championship",
+    courseName: "Port Royal Golf Course",
+    courseId: 7,
+  },
+  "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=2#Bermuda",
+);
 
 /** The HTML's text, roughly as a reader sees it. */
 const text = (data: PageData | null, now: Date = NOW) =>
@@ -260,5 +292,54 @@ describe("PageView, rendered on the server", () => {
     expect(t).toContain("75 %");
     expect(t).toContain("3 results");
     expect(t).toContain("no record");
+  });
+
+  it("names a skipped Tournament, its reason and a link to it, above the ranking", () => {
+    const data: PageData = { ...DATA, skipped: [SKIPPED_BERMUDA] };
+    const h = html(data);
+    const t = text(data);
+    expect(t).toContain("Butterfield Bermuda Championship");
+    expect(t).toContain(SKIPPED_BERMUDA.reason);
+    expect(h).toContain(`href="${SKIPPED_BERMUDA.sourceUrl!.replace(/&/g, "&amp;")}"`);
+    // Above the ranking: a reader meets the disclosure before the Players it explains.
+    expect(h.indexOf("Butterfield Bermuda Championship")).toBeLessThan(
+      h.indexOf("data-player"),
+    );
+    // And the Tournament on show is no longer called the next one without qualification.
+    expect(t).toContain("The next PGA Tour Tournament we can rank");
+    expect(t).toContain("Arnold Palmer Invitational is the soonest one we can rank");
+  });
+
+  it("names every skipped Tournament, in schedule order, each with its own reason", () => {
+    const data: PageData = { ...DATA, skipped: [SKIPPED_AUSTIN, SKIPPED_BERMUDA] };
+    const h = html(data);
+    const t = text(data);
+    expect(t).toContain("2 were skipped");
+    expect(t).toContain(SKIPPED_AUSTIN.reason);
+    expect(t).toContain(SKIPPED_BERMUDA.reason);
+    expect(h).toContain(`href="${SKIPPED_AUSTIN.sourceUrl!.replace(/&/g, "&amp;")}"`);
+    expect(h).toContain(`href="${SKIPPED_BERMUDA.sourceUrl!.replace(/&/g, "&amp;")}"`);
+    expect(h.indexOf("Austin Championship")).toBeLessThan(
+      h.indexOf("Butterfield Bermuda Championship"),
+    );
+  });
+
+  it("names a skipped Tournament the schedule has no revision for, without a link", () => {
+    const data: PageData = {
+      ...DATA,
+      skipped: [{ ...SKIPPED_AUSTIN, sourceUrl: null }],
+    };
+    expect(text(data)).toContain("Austin Championship");
+    expect(() => html(data)).not.toThrow();
+  });
+
+  it("renders no disclosure at all when nothing was skipped", () => {
+    const h = html(DATA);
+    const t = text(DATA);
+    expect(h).not.toContain('id="skipped"');
+    expect(t).not.toContain("skipped");
+    expect(t).not.toContain("not the soonest Tournament");
+    expect(t).toContain("The next PGA Tour Tournament");
+    expect(t).not.toContain("The next PGA Tour Tournament we can rank");
   });
 });

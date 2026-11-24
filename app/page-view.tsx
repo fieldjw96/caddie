@@ -192,7 +192,7 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
     );
   }
 
-  const { tournament, course, traits, players, coverage } = data;
+  const { tournament, skipped, course, traits, players, coverage } = data;
   const profile = courseProfile(course, traits);
   const hasVenue = players.some((p) => p.venueRecord !== null && p.venueRecord.value !== null);
   const courseName = course?.name ?? tournament.courseName;
@@ -205,7 +205,11 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
           <div className="flex flex-wrap items-center justify-between gap-3 font-display text-base font-semibold tracking-[0.1em] uppercase">
             <p className="flex items-center gap-3">
               <Wordmark />
-              <span className="text-on-band-muted">The next PGA Tour Tournament</span>
+              <span className="text-on-band-muted">
+                {skipped.length > 0
+                  ? "The next PGA Tour Tournament we can rank"
+                  : "The next PGA Tour Tournament"}
+              </span>
             </p>
             <p className="text-on-band-muted">
               Strengths derived {formatFreshnessDate(data.strengthsDerivedAt)}, from results
@@ -224,6 +228,44 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
           </p>
         </div>
       </header>
+
+      {skipped.length > 0 && (
+        <section
+          aria-labelledby="skipped"
+          className="border-b border-gap-rule bg-gap-panel text-[0.95rem] leading-normal"
+        >
+          <div className={`${COLUMN} py-3.5`}>
+            <h2
+              id="skipped"
+              className="font-display text-[1.05rem] tracking-[0.06em] text-gap uppercase"
+            >
+              {skipped.length === 1
+                ? "This is not the soonest Tournament: one was skipped."
+                : `This is not the soonest Tournament: ${skipped.length} were skipped.`}
+            </h2>
+            <p className="mt-1">
+              {tournament.name} is the soonest one we can rank. Every Tournament listed below
+              comes sooner on the schedule and could not be ranked, for the reason given:
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {skipped.map((s) => (
+                <li key={s.name}>
+                  <strong className="font-semibold">
+                    {s.sourceUrl !== null ? (
+                      <a href={s.sourceUrl} className="underline">
+                        {s.name}
+                      </a>
+                    ) : (
+                      s.name
+                    )}
+                  </strong>{" "}
+                  — {s.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       <div className="border-b border-gap-rule bg-gap-panel">
         <p className={`${COLUMN} py-3.5 text-[0.95rem] leading-normal`}>

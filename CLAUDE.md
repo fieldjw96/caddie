@@ -1,7 +1,10 @@
 # Caddie
 
-A public site that ranks the field of the next PGA Tour tournament by how well each Player's
-game suits that Course, with the weightings on display and adjustable.
+A public site that ranks the field of the soonest PGA Tour tournament it can rank by how well
+each Player's game suits that Course, with the weightings on display and adjustable. That is
+usually the next one. Where it is not — a Tournament with no venue, no matched Course or no
+Course Trait cannot be ranked — the site falls forward to the soonest one it can, and names
+every Tournament it skipped and why, above the ranking.
 
 Built entirely through Runs dispatched by `foreman`. See [[CONTEXT]] for this repo's
 vocabulary and `docs/adr/` for its decisions.
