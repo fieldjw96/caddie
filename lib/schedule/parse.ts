@@ -27,8 +27,21 @@ interface RawRow {
   cells: string[];
 }
 
+/**
+ * The texts a Tournament cell holds in place of a Tournament, before the page has named one.
+ * Matched case-insensitively after `stripWikiMarkup`, which already drops the `''`/`'''` the
+ * 2027 article wraps "TBD" in.
+ */
+export const PLACEHOLDER_TOURNAMENT_TEXTS = [
+  "TBD",
+  "TBA",
+  "To be determined",
+  "To be announced",
+] as const;
+
 /** One row parsed into what this Ticket needs, before the canceled ones are dropped. */
-export interface ScheduleRow {
+export interface NamedScheduleRow {
+  placeholder: false;
   name: string;
   /** The wikilink target of the tournament's own article, for looking up its Course. */
   pageTitle: string;
@@ -41,6 +54,21 @@ export interface ScheduleRow {
   location: string | null;
   canceled: boolean;
 }
+
+/**
+ * A row whose Date and Location are real but whose Tournament cell is a placeholder like
+ * `''TBD''`: the page has not yet named who plays there. Never given an invented `name` or
+ * `pageTitle` — a caller drops it, after counting it, the way it already drops a canceled row.
+ */
+export interface PlaceholderScheduleRow {
+  placeholder: true;
+  startDate: string;
+  endDate: string;
+  location: string | null;
+  canceled: boolean;
+}
+
+export type ScheduleRow = NamedScheduleRow | PlaceholderScheduleRow;
 
 /**
  * The official Schedule table's wikitext, cut from the section wikitext before any nested
@@ -102,19 +130,17 @@ const dateCellSchema = z
   .transform((cell) => stripWikiMarkup(cell.replace(/<\/?s>/g, "")).trim())
   .pipe(z.string().regex(/^[A-Z][a-z]{2} \d{1,2}$/, 'the "Date" cell did not match "Mon D"'));
 
-const tournamentCellSchema = z
+const tournamentWikilinkSchema = z
   .string()
-  .transform((cell) => stripWikiMarkup(cell).trim())
-  .pipe(
-    z
-      .string()
-      .regex(
-        /^\[\[[^|\]]+(?:\|[^\]]+)?\]\]$/,
-        'the "Tournament" cell was not a single wikilink',
-      ),
-  );
+  .regex(/^\[\[[^|\]]+(?:\|[^\]]+)?\]\]$/, 'the "Tournament" cell was not a single wikilink');
 
 const WIKILINK = /^\[\[([^|\]]+)(?:\|([^\]]+))?\]\]$/;
+
+function isPlaceholderTournamentCell(strippedCell: string): boolean {
+  return PLACEHOLDER_TOURNAMENT_TEXTS.some(
+    (text) => text.toLowerCase() === strippedCell.toLowerCase(),
+  );
+}
 
 function parseWikilink(cell: string): { target: string; display: string } {
   const match = WIKILINK.exec(cell);
@@ -155,8 +181,9 @@ function startDateFromEnd(endDate: string): string {
 }
 
 /**
- * The official schedule, one row per tournament including the canceled ones — a caller that
- * wants to write `tournaments` rows should drop `canceled` rows itself, after counting them,
+ * The official schedule, one row per tournament including the canceled ones and the
+ * placeholder ones (a Tournament cell reading `''TBD''` or similar, not yet a wikilink) — a
+ * caller that wants to write `tournaments` rows should drop both itself, after counting them,
  * because a schedule that silently lost a row is exactly the failure this Ticket exists to
  * catch loudly instead.
  */
@@ -180,7 +207,16 @@ export function parseSchedule(sectionWikitext: string, season: number): Schedule
     if (!dateResult.success) {
       throw new Error(`Schedule row ${index + 1}: ${dateResult.error.issues[0]?.message}`);
     }
-    const tournamentResult = tournamentCellSchema.safeParse(tournamentCell);
+    const endDate = parseDate(dateResult.data, season);
+    const startDate = startDateFromEnd(endDate);
+    const location = parseLocation(locationCell!);
+
+    const strippedTournament = stripWikiMarkup(tournamentCell!).trim();
+    if (isPlaceholderTournamentCell(strippedTournament)) {
+      return { placeholder: true, startDate, endDate, location, canceled };
+    }
+
+    const tournamentResult = tournamentWikilinkSchema.safeParse(strippedTournament);
     if (!tournamentResult.success) {
       throw new Error(
         `Schedule row ${index + 1}: ${tournamentResult.error.issues[0]?.message}`,
@@ -188,14 +224,14 @@ export function parseSchedule(sectionWikitext: string, season: number): Schedule
     }
 
     const { target, display } = parseWikilink(tournamentResult.data);
-    const endDate = parseDate(dateResult.data, season);
 
     return {
+      placeholder: false,
       name: display,
       pageTitle: target,
-      startDate: startDateFromEnd(endDate),
+      startDate,
       endDate,
-      location: parseLocation(locationCell!),
+      location,
       canceled,
     };
   });

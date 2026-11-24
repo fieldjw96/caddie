@@ -10,7 +10,7 @@
 // previous season's autumn. Seasons before that are not read by default; see ADR 0002 for how
 // thin they are anyway.
 
-import type { ScheduleRow } from "../schedule/parse";
+import type { NamedScheduleRow, ScheduleRow } from "../schedule/parse";
 
 /** The seasons a run reads by default, oldest first, as of `today` (`YYYY-MM-DD`). */
 export function defaultSeasons(today: string): number[] {
@@ -40,9 +40,10 @@ export function eventArticles(
   today: string,
 ): EventArticles {
   const editions = rows.filter(
-    (row) => !row.canceled && row.pageTitle.startsWith(`${season} `),
+    (row): row is NamedScheduleRow =>
+      !row.canceled && !row.placeholder && row.pageTitle.startsWith(`${season} `),
   );
-  const titles = (list: readonly ScheduleRow[]) => [
+  const titles = (list: readonly NamedScheduleRow[]) => [
     ...new Set(list.map((row) => row.pageTitle)),
   ];
   const played = titles(editions.filter((row) => row.endDate < today));
