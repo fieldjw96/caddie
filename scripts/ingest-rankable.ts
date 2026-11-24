@@ -2,49 +2,22 @@
 // Tournament, the one the page is about to render, can actually be ranked. Runs after
 // `ingest:report`, reads only what the earlier stages already stored, and fails loudly, naming
 // which of lib/ingest/rankable.ts's three conditions is true, rather than letting a green run
-// hide a page with zero Player rows. See that file for the decision; this just gathers what it
-// needs to make it.
+// hide a page with zero Player rows. See that file for the decision; lib/ingest/rankable-query.ts
+// is the gathering, shared with app/api/health/route.ts; this just shapes it into the next
+// Tournament and asks.
 
-import { count, eq, isNotNull } from "drizzle-orm";
 import { client, db } from "../db/migration-client";
-import { courses, courseTraits, playerStrengths, tournaments } from "../db/schema";
 import { checkRankable, type NextTournament } from "../lib/ingest/rankable";
+import { gatherRankabilityData } from "../lib/ingest/rankable-query";
 import { matchCourse } from "../lib/page/data";
 import { nextTournament } from "../lib/schedule/next-tournament";
 
-async function courseTraitCount(courseId: number): Promise<number> {
-  const [row] = await db
-    .select({ n: count() })
-    .from(courseTraits)
-    .where(eq(courseTraits.courseId, courseId));
-  return row?.n ?? 0;
-}
-
-async function anyPlayerHasStrength(): Promise<boolean> {
-  const [row] = await db
-    .select({ n: count() })
-    .from(playerStrengths)
-    .where(isNotNull(playerStrengths.value));
-  return (row?.n ?? 0) > 0;
-}
-
 async function main(): Promise<void> {
-  const schedule = await db
-    .select({
-      name: tournaments.name,
-      startDate: tournaments.startDate,
-      endDate: tournaments.endDate,
-      courseName: tournaments.courseName,
-      courseId: tournaments.courseId,
-    })
-    .from(tournaments);
+  const { schedule, courses, traitCounts, anyPlayerHasStrength } =
+    await gatherRankabilityData(db);
   const upcoming = nextTournament(schedule, new Date());
-  const knownCourses = await db.select({ id: courses.id, name: courses.name }).from(courses);
   const matchedCourse = upcoming
-    ? matchCourse(
-        { courseId: upcoming.courseId, courseName: upcoming.courseName },
-        knownCourses,
-      )
+    ? matchCourse({ courseId: upcoming.courseId, courseName: upcoming.courseName }, courses)
     : null;
   const next: NextTournament | null = upcoming
     ? {
@@ -56,8 +29,8 @@ async function main(): Promise<void> {
 
   const result = checkRankable({
     next,
-    courseTraitCount: next?.courseId == null ? 0 : await courseTraitCount(next.courseId),
-    anyPlayerHasStrength: await anyPlayerHasStrength(),
+    courseTraitCount: next?.courseId == null ? 0 : (traitCounts.get(next.courseId) ?? 0),
+    anyPlayerHasStrength,
   });
 
   if (result.ok) {
