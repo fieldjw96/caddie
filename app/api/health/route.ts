@@ -102,10 +102,10 @@ async function rankableSummary(database: Database, now: Date): Promise<RankableS
   // `upcoming` is not empty, so the walk always answers with one of its Tournaments; this is
   // the type's null case, not a state reachable from here. See lib/page/load.ts.
   const next = tournament!;
-  const courseId = matchCourse(next, courses)?.id ?? null;
-  const courseTraitCount = courseId === null ? 0 : (traitCounts.get(courseId) ?? 0);
+  const courseRow = matchCourse(next, courses);
+  const courseTraitCount = courseRow === null ? 0 : (traitCounts.get(courseRow.id) ?? 0);
   const result = checkRankable({
-    next: { name: next.name, courseName: next.courseName, courseId },
+    next: { name: next.name, courseName: next.courseName, courseId: courseRow?.id ?? null },
     courseTraitCount,
     anyPlayerHasStrength,
   });
@@ -113,11 +113,13 @@ async function rankableSummary(database: Database, now: Date): Promise<RankableS
   return {
     state: result.ok ? "rankable" : "unrankable",
     tournament: next.name,
-    course: matchCourse(next, courses)?.name ?? null,
+    course: courseRow?.name ?? null,
     courseTraitCount,
     anyPlayerHasStrength,
     reason: result.ok ? null : result.reason,
-    ...(next.name === trueNext.name ? {} : { trueNextTournament: trueNext.name }),
+    // The walk hands back one of `upcoming`'s own elements, so reference equality is exact,
+    // unlike comparing names: an edition that recurs under the same name never reaches here.
+    ...(next === trueNext ? {} : { trueNextTournament: trueNext.name }),
   };
 }
 
