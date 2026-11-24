@@ -128,7 +128,7 @@ export async function upsertTournaments(
   // The `course_name` this statement will leave stored, written once and reused, so the test
   // for "the venue changed" cannot drift from the value whose change it is testing for.
   const nextCourseName = sql`case when excluded.course_article_url is null
-          then ${tournaments.courseName} else excluded.course_name end`;
+    then ${tournaments.courseName} else excluded.course_name end`;
   // `is distinct from`, not `<>`: a venue going from a name to none, or from none to a name, is
   // a change like any other, and `<>` would call both of those unknown and keep the link.
   const venueChanged = sql`(${nextCourseName}) is distinct from ${tournaments.courseName}`;

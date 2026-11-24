@@ -149,12 +149,20 @@ export async function storePlan<TSchema extends Record<string, unknown>>(
         }
         continue;
       }
+      // Read before the write, not asserted into it: a `set` with an undefined `course_id`
+      // would write `course_match` alone, which the check constraint exists to refuse. The
+      // plan always carries a matched course's row, so this says so rather than finding out.
+      const courseId = idByOpenGolfApiId.get(resolution.openGolfApiId);
+      if (courseId === undefined) {
+        throw new Error(
+          `Matched "${resolution.openGolfApiName}" (OpenGolfAPI ` +
+            `${resolution.openGolfApiId}) for ${tournament.name}, which this run did not ` +
+            "store. Nothing was written.",
+        );
+      }
       await tx
         .update(tournaments)
-        .set({
-          courseId: idByOpenGolfApiId.get(resolution.openGolfApiId)!,
-          courseMatch: resolution.confidence,
-        })
+        .set({ courseId, courseMatch: resolution.confidence })
         .where(eq(tournaments.id, tournament.id));
     }
 
