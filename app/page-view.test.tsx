@@ -106,6 +106,21 @@ describe("PageView, rendered on the server", () => {
     expect(t).toContain("Bay Hill Club and Lodge");
   });
 
+  it("renders a multi-course schedule entry in words in the heading, with no Course matched", () => {
+    const data: PageData = {
+      ...DATA,
+      course: null,
+      traits: {},
+      tournament: {
+        ...DATA.tournament,
+        courseName: "Sea Island Golf Club, (Seaside Course), (Plantation Course)",
+      },
+    };
+    const t = text(data);
+    expect(t).toContain("Sea Island Golf Club (Seaside Course and Plantation Course)");
+    expect(t).not.toContain(", (");
+  });
+
   it("renders the Course Profile, the ranking and the gaps without any JavaScript", () => {
     const t = text(DATA);
     expect(t).toContain("7,466 yards");
