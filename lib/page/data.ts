@@ -4,7 +4,7 @@
 // gaps are shown rather than hidden: the product's claim is that it shows its working.
 
 import type { Source } from "../../db/schema";
-import { DECLARED_MATCHES, scheduledCourses } from "../courses/match";
+import { declaredFor, scheduledCourses } from "../courses/match";
 import type { FitCourseTraits, FitTraitName } from "../fit";
 
 /** One Strength as the page shows it: the value, and always the sample it rests on. */
@@ -183,7 +183,7 @@ export function matchCourse<C extends { id: number; name: string }>(
     return matches[0];
   };
 
-  const declared = DECLARED_MATCHES.find((d) => d.schedule === tournament.courseName);
+  const declared = declaredFor(tournament.courseName);
   const listed = scheduledCourses(tournament.courseName);
   const names = [
     ...(declared ? [declared.name] : []),
