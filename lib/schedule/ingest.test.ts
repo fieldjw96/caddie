@@ -8,6 +8,7 @@ import type { ScheduleRow } from "./parse";
 
 const ROWS: ScheduleRow[] = [
   {
+    placeholder: false,
     name: "The Sentry",
     pageTitle: "The Sentry (Hawaii)",
     startDate: "2026-01-11",
@@ -16,6 +17,7 @@ const ROWS: ScheduleRow[] = [
     canceled: true,
   },
   {
+    placeholder: false,
     name: "Sony Open in Hawaii",
     pageTitle: "Sony Open in Hawaii",
     startDate: "2026-01-18",
@@ -24,10 +26,18 @@ const ROWS: ScheduleRow[] = [
     canceled: false,
   },
   {
+    placeholder: false,
     name: "The American Express",
     pageTitle: "The American Express",
     startDate: "2026-01-25",
     endDate: "2026-01-28",
+    location: null,
+    canceled: false,
+  },
+  {
+    placeholder: true,
+    startDate: "2026-02-15",
+    endDate: "2026-02-18",
     location: null,
     canceled: false,
   },
@@ -51,6 +61,20 @@ describe("buildTournamentRecords", () => {
 
     expect(records).toHaveLength(2);
     expect(records.every((r) => !("courseId" in r))).toBe(true);
+  });
+
+  it("drops a placeholder row too, not yet a Tournament to write", () => {
+    const records = buildTournamentRecords(
+      ROWS,
+      2026,
+      "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
+      new Map(),
+    );
+
+    expect(records.map((r) => r.name)).toEqual([
+      "Sony Open in Hawaii",
+      "The American Express",
+    ]);
   });
 
   it("carries the Course name, par and yardage as the article states them", () => {
