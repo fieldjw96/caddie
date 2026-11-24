@@ -315,21 +315,21 @@ describe("formatDates", () => {
 
 describe("formatDatesAndCourse", () => {
   it("appends location to the dates and course when non-null", () => {
-    expect(formatDatesAndCourse("2026-11-18", "2026-11-23", "Sea Island Golf Club", "Georgia")).toBe(
-      "18–23 November 2026, at Sea Island Golf Club, Georgia",
-    );
+    expect(
+      formatDatesAndCourse("2026-11-18", "2026-11-23", "Sea Island Golf Club", "Georgia"),
+    ).toBe("18–23 November 2026, at Sea Island Golf Club, Georgia");
   });
 
   it("omits location when null", () => {
-    expect(formatDatesAndCourse("2026-11-18", "2026-11-23", "Sea Island Golf Club", null)).toBe(
-      "18–23 November 2026, at Sea Island Golf Club",
-    );
+    expect(
+      formatDatesAndCourse("2026-11-18", "2026-11-23", "Sea Island Golf Club", null),
+    ).toBe("18–23 November 2026, at Sea Island Golf Club");
   });
 
   it("says Course not yet known when no course is matched, with location appended", () => {
-    expect(
-      formatDatesAndCourse("2026-11-18", "2026-11-23", null, "Georgia"),
-    ).toBe("18–23 November 2026, at a Course not yet known to us, Georgia");
+    expect(formatDatesAndCourse("2026-11-18", "2026-11-23", null, "Georgia")).toBe(
+      "18–23 November 2026, at a Course not yet known to us, Georgia",
+    );
   });
 
   it("says Course not yet known when no course is matched, without location", () => {
