@@ -10,11 +10,24 @@
 // never the credentials, and a driver error's code and message with anything credential-shaped
 // removed. That is enough to tell a missing variable from a refused connection from an empty
 // table, which is the whole question, and not enough to hand anyone a way in.
+//
+// A healthy connection to a populated database is still not an answer: four outages in six
+// weeks left the homepage with no Player rows while this route said `ok: true` throughout,
+// because it only ever counted `tournaments` rows. `rankable` below asks the same question the
+// page answers, the same way the page answers it, so this route cannot disagree with what a
+// reader actually sees.
 
 import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { db } from "@/db/client";
-import { resolveAppDatabaseUrl } from "@/db/env";
+import { db } from "../../../db/client";
+import { resolveAppDatabaseUrl } from "../../../db/env";
+import { checkRankable } from "../../../lib/ingest/rankable";
+import { gatherRankabilityData } from "../../../lib/ingest/rankable-query";
+import { matchCourse } from "../../../lib/page/data";
+import { chooseRankableTournament } from "../../../lib/page/choose-tournament";
+import { upcomingTournaments } from "../../../lib/schedule/next-tournament";
+
+type Database = typeof db;
 
 // A health check that reads a cached answer is not a health check.
 export const dynamic = "force-dynamic";
@@ -43,6 +56,73 @@ function endpoint(url: string): string {
   }
 }
 
+type RankableState = "rankable" | "unrankable" | "no-next-tournament";
+
+interface RankableSummary {
+  state: RankableState;
+  /** The Tournament the homepage would render right now, or null once the season has none left. */
+  tournament: string | null;
+  course: string | null;
+  courseTraitCount: number;
+  anyPlayerHasStrength: boolean;
+  /** `checkRankable`'s reason the homepage's Tournament fails, or null when it does not. */
+  reason: string | null;
+  /** Present only when the page fell forward (#154) past this, the true next Tournament. */
+  trueNextTournament?: string;
+}
+
+/**
+ * Whether the Tournament the homepage would actually render can be ranked, and why not when it
+ * cannot. Chooses that Tournament the same way `lib/page/load.ts`'s `loadPageData` does after
+ * #154 — `upcomingTournaments` then `chooseRankableTournament` — over data
+ * `gatherRankabilityData` reads once, so this can never disagree with the page.
+ */
+async function rankableSummary(database: Database, now: Date): Promise<RankableSummary> {
+  const { schedule, courses, traitCounts, anyPlayerHasStrength } =
+    await gatherRankabilityData(database);
+  const upcoming = upcomingTournaments(schedule, now);
+  if (upcoming.length === 0) {
+    return {
+      state: "no-next-tournament",
+      tournament: null,
+      course: null,
+      courseTraitCount: 0,
+      anyPlayerHasStrength,
+      reason: null,
+    };
+  }
+
+  const trueNext = upcoming[0]!;
+  const { tournament } = chooseRankableTournament(
+    upcoming,
+    courses,
+    traitCounts,
+    anyPlayerHasStrength,
+  );
+  // `upcoming` is not empty, so the walk always answers with one of its Tournaments; this is
+  // the type's null case, not a state reachable from here. See lib/page/load.ts.
+  const next = tournament!;
+  const courseRow = matchCourse(next, courses);
+  const courseTraitCount = courseRow === null ? 0 : (traitCounts.get(courseRow.id) ?? 0);
+  const result = checkRankable({
+    next: { name: next.name, courseName: next.courseName, courseId: courseRow?.id ?? null },
+    courseTraitCount,
+    anyPlayerHasStrength,
+  });
+
+  return {
+    state: result.ok ? "rankable" : "unrankable",
+    tournament: next.name,
+    course: courseRow?.name ?? null,
+    courseTraitCount,
+    anyPlayerHasStrength,
+    reason: result.ok ? null : result.reason,
+    // The walk hands back one of `upcoming`'s own elements, so reference equality is exact,
+    // unlike comparing names: an edition that recurs under the same name never reaches here.
+    ...(next === trueNext ? {} : { trueNextTournament: trueNext.name }),
+  };
+}
+
 export async function GET() {
   const variables = Object.fromEntries(
     CONNECTION_VARS.map((name) => [name, process.env[name] !== undefined]),
@@ -68,12 +148,14 @@ export async function GET() {
     const [row] = await db.execute<{ tournaments: number }>(
       sql`select count(*)::int as tournaments from tournaments`,
     );
+    const rankable = await rankableSummary(db, new Date());
     return NextResponse.json({
       ok: true,
       stage: "query",
       variables,
       endpoint: endpoint(url),
       tournaments: row?.tournaments ?? 0,
+      rankable,
     });
   } catch (error) {
     // The interesting case. A refused connection, a TLS failure, a pooler rejecting a
