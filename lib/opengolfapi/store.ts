@@ -1,6 +1,7 @@
 // Writing ingested courses, and every stored season's matches. Courses are keyed on their
 // OpenGolfAPI id, so storing the same course again updates its row rather than adding one, and
-// a Tournament's match is set outright each run, so re-running changes no counts.
+// a Tournament's match is only ever set to a match this run made, so re-running changes no
+// counts and a run that matched nothing changes nothing.
 //
 // A Course created from a Tournament's own Wikipedia article, because OpenGolfAPI does not have
 // it, is written here too — in the same transaction as the matches, so a run leaves one
@@ -10,11 +11,11 @@
 // nothing here decides it a second time, and a venue that plan says is a Course already stored
 // is linked to without a write of any kind.
 
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { eq, inArray, isNull, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
-import { courses, tournaments } from "../../db/schema";
+import { courses, tournaments, type CourseMatch } from "../../db/schema";
 import type { ArticleCoursePlan, KnownCourse } from "../courses/from-tournament";
-import type { CoursePlan, CourseRow } from "./ingest";
+import type { CoursePlan, CourseRow, Resolution } from "./ingest";
 
 // Generic over schema: called with db/migration-client.ts's schema-attached db from
 // scripts/ingest-courses.ts, and with a schema-less one from store.db.test.ts. Cares only that
@@ -59,9 +60,40 @@ export async function storeCourseByName<TSchema extends Record<string, unknown>>
 }
 
 /**
- * Writes a whole plan in one transaction: every matched course, then every Tournament in it,
- * each set to its match or to null. A Tournament that matched last time and does not now is
- * cleared rather than left pointing at a match this run could not repeat.
+ * One Tournament whose stored link this run left exactly as it found it, because it had nothing
+ * better to say about the venue. The caller reports these: a link nobody re-confirmed is still
+ * the best answer there is, but it is worth saying out loud which Tournaments are living on one.
+ */
+export interface KeptLink {
+  tournamentId: number;
+  tournamentName: string;
+  /** The `courses.id` still linked, and the name under which a reader will see it. */
+  courseId: number;
+  courseName: string;
+  /** How that link was matched, as it stands stored, which is not how this run resolved it. */
+  courseMatch: CourseMatch;
+  /** This run's resolution, which could not re-confirm the link. Never `matched`. */
+  status: Exclude<Resolution["status"], "matched">;
+}
+
+/**
+ * Writes a whole plan in one transaction: every matched course, then a link for every
+ * Tournament this run matched.
+ *
+ * A stored link is only ever replaced by something better: a match this run made, or the
+ * Course a Tournament's own article names. A resolution of anything else — `near-miss`,
+ * `failed` — leaves `course_id` and `course_match` exactly as they are, whatever they are,
+ * `declared` included, because a search that came back differently today says nothing about
+ * whether yesterday's link was right. Clearing one of those blanked a whole Tournament week
+ * once (#158), taking the Course, its Traits and every Fit Score with it. Where a venue really
+ * has changed, `upsertTournaments` in lib/schedule/ingest.ts clears the link as it writes the
+ * new `course_name`: that is the one place that can tell, because it is the only one that sees
+ * the name a link was made against.
+ *
+ * Every link written here sets both columns together, so `tournaments_course_match_is_recorded`
+ * holds on every path.
+ *
+ * The Tournaments whose link was left unconfirmed are returned, for the caller to report.
  *
  * `fromArticles` is written after the matches and wins for its own Tournaments alone: a venue
  * is only ever planned for a Tournament OpenGolfAPI did not match, so the two cannot disagree.
@@ -69,45 +101,68 @@ export async function storeCourseByName<TSchema extends Record<string, unknown>>
  * their results within reach of one another's venue record.
  *
  * Where an article could not be read as a Course — one that states no par, or one nothing has
- * read yet — a Course an earlier run created from that same article is left linked rather than
- * cleared, because this run's failure says nothing about whether that Course is still the right
- * one. Nothing else is spared: a Tournament whose OpenGolfAPI match this run could not repeat
- * is still cleared, as it was before.
+ * read yet — nothing special happens: `fromArticles.skipped` plans no venue, so the rule above
+ * leaves whatever is linked alone. That is why the branch this function used to keep for those
+ * Tournaments is gone, rather than kept and widened.
  */
 export async function storePlan<TSchema extends Record<string, unknown>>(
   db: Database<TSchema>,
   plan: CoursePlan,
   fromArticles: ArticleCoursePlan = { venues: [], skipped: [] },
-): Promise<void> {
-  await db.transaction(async (tx) => {
+): Promise<KeptLink[]> {
+  return db.transaction(async (tx) => {
     const idByOpenGolfApiId = new Map<string, number>();
     for (const row of plan.rows) {
       idByOpenGolfApiId.set(row.openGolfApiId!, await storeCourse(tx, row));
     }
-    const spared = new Set(fromArticles.skipped.map((s) => s.tournamentId));
+    // Linked from their own articles further down, so their links are not kept ones: this run
+    // has something to say about the venue, just not from OpenGolfAPI.
+    const relinked = new Set(
+      fromArticles.venues.flatMap((venue) => venue.tournaments.map((t) => t.id)),
+    );
+    const kept: KeptLink[] = [];
     for (const { tournament, resolution } of plan.outcomes) {
-      const matched = resolution.status === "matched" ? resolution : null;
-      // Left as it is only if what is there came from this same article; a stale OpenGolfAPI
-      // match is cleared like any other. A Tournament with no match at all matches neither
-      // arm and needs no clearing.
-      if (matched === null && spared.has(tournament.id)) {
-        await tx
-          .update(tournaments)
-          .set({ courseId: null, courseMatch: null })
-          .where(
-            and(
-              eq(tournaments.id, tournament.id),
-              inArray(tournaments.courseMatch, ["exact", "normalised", "declared"]),
-            ),
-          );
+      if (resolution.status !== "matched") {
+        if (relinked.has(tournament.id)) continue;
+        // The inner join is the question being asked: a Tournament with nothing linked has no
+        // link to keep, and drops out rather than being reported as one.
+        const [stored] = await tx
+          .select({
+            courseId: courses.id,
+            courseName: courses.name,
+            courseMatch: tournaments.courseMatch,
+          })
+          .from(tournaments)
+          .innerJoin(courses, eq(tournaments.courseId, courses.id))
+          .where(eq(tournaments.id, tournament.id));
+        // `course_match` is non-null wherever `course_id` is, by check constraint; this reads
+        // it back rather than asserting it, because the report prints it.
+        if (stored && stored.courseMatch !== null) {
+          kept.push({
+            tournamentId: tournament.id,
+            tournamentName: tournament.name,
+            courseId: stored.courseId,
+            courseName: stored.courseName,
+            courseMatch: stored.courseMatch,
+            status: resolution.status,
+          });
+        }
         continue;
+      }
+      // Read before the write, not asserted into it: a `set` with an undefined `course_id`
+      // would write `course_match` alone, which the check constraint exists to refuse. The
+      // plan always carries a matched course's row, so this says so rather than finding out.
+      const courseId = idByOpenGolfApiId.get(resolution.openGolfApiId);
+      if (courseId === undefined) {
+        throw new Error(
+          `Matched "${resolution.openGolfApiName}" (OpenGolfAPI ` +
+            `${resolution.openGolfApiId}) for ${tournament.name}, which this run did not ` +
+            "store. Nothing was written.",
+        );
       }
       await tx
         .update(tournaments)
-        .set({
-          courseId: matched ? idByOpenGolfApiId.get(matched.openGolfApiId)! : null,
-          courseMatch: matched?.confidence ?? null,
-        })
+        .set({ courseId, courseMatch: resolution.confidence })
         .where(eq(tournaments.id, tournament.id));
     }
 
@@ -137,5 +192,6 @@ export async function storePlan<TSchema extends Record<string, unknown>>(
           ),
         );
     }
+    return kept;
   });
 }

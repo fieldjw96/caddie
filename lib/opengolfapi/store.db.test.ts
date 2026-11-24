@@ -9,7 +9,13 @@ import { afterAll, describe, expect, it } from "vitest";
 import { courses, tournaments } from "../../db/schema";
 import { planArticleCourses } from "../courses/from-tournament";
 import augusta from "./fixtures/augusta-national.detail.json";
-import { toCourseRow, type CoursePlan, type CourseRow } from "./ingest";
+import {
+  toCourseRow,
+  type CoursePlan,
+  type CourseRow,
+  type Resolution,
+  type ScheduledTournament,
+} from "./ingest";
 import { courseResponse, parse } from "./schema";
 import { storeCourse, storePlan } from "./store";
 
@@ -45,6 +51,53 @@ async function refusal(values: CourseRow): Promise<string> {
 }
 
 const tournamentIds: number[] = [];
+
+/** One stored Tournament, as the schedule writes it, with nothing linked to it yet. */
+async function seedTournament(
+  name: string,
+  courseName: string | null = "Augusta National Golf Club",
+): Promise<ScheduledTournament> {
+  const [inserted] = await db
+    .insert(tournaments)
+    .values({
+      name: `${name} ${run}`,
+      season: 2026,
+      startDate: "2026-04-09",
+      endDate: "2026-04-12",
+      courseName,
+      location: "Georgia",
+      source: "wikipedia" as const,
+      sourceUrl: "https://en.wikipedia.org/wiki/2026_PGA_Tour",
+    })
+    .returning({
+      id: tournaments.id,
+      name: tournaments.name,
+      courseName: tournaments.courseName,
+      location: tournaments.location,
+    });
+  tournamentIds.push(inserted!.id);
+  return inserted!;
+}
+
+/** What one Tournament's link is right now: the two columns that must move together. */
+const linkOf = async (id: number) =>
+  (
+    await db
+      .select({ courseId: tournaments.courseId, match: tournaments.courseMatch })
+      .from(tournaments)
+      .where(eq(tournaments.id, id))
+  )[0]!;
+
+async function linkCourse(
+  tournamentId: number,
+  courseId: number,
+  match: "exact" | "declared" | "normalised",
+) {
+  await db
+    .update(tournaments)
+    .set({ courseId, courseMatch: match })
+    .where(eq(tournaments.id, tournamentId));
+}
 
 afterAll(async () => {
   if (tournamentIds.length > 0) {
@@ -112,7 +165,10 @@ describe("courses", () => {
 });
 
 describe("storePlan", () => {
-  it("links each Tournament to its match, clears one that no longer matches, and re-runs to the same counts", async () => {
+  // Replaces an earlier test that asserted the second Tournament's stale link was cleared.
+  // It is not: a search that came back differently today is not a reason to blank a page. See
+  // the keeps-a-link tests below for the rule on its own.
+  it("links each Tournament to its match, keeps a link it could not re-confirm, and re-runs to the same counts", async () => {
     const inserted = await db
       .insert(tournaments)
       .values(
@@ -154,11 +210,11 @@ describe("storePlan", () => {
       rows: [course],
     };
 
-    // The second Tournament starts matched, as a stale match from an earlier run would be.
-    const staleCourse = await storeCourse(db, row());
+    // The second Tournament starts matched, as a link from an earlier run would be.
+    const earlierLink = await storeCourse(db, row());
     await db
       .update(tournaments)
-      .set({ courseId: staleCourse, courseMatch: "normalised" })
+      .set({ courseId: earlierLink, courseMatch: "normalised" })
       .where(eq(tournaments.id, unmatched!.id));
 
     const linked = async () =>
@@ -179,9 +235,98 @@ describe("storePlan", () => {
     await storePlan(db, plan);
 
     expect(first[0]).toMatchObject({ match: "exact", courseId: expect.any(Number) });
-    expect(first[1]).toMatchObject({ match: null, courseId: null });
+    expect(first[1]).toMatchObject({ match: "normalised", courseId: earlierLink });
     expect(await linked()).toEqual(first);
     expect(await courseCount()).toBe(coursesAfterFirst);
+  });
+
+  // The rule this Ticket exists for: one search coming back differently must not erase a link
+  // that was right the day before, whatever that link says about how it was made. `declared`
+  // is the hardest case, because a human put it there by hand.
+  it("leaves a declared link exactly as it is, for a near-miss and for a failure alike", async () => {
+    const t = await seedTournament("Declared Open");
+    const course = row();
+    const courseId = await storeCourse(db, course);
+    await linkCourse(t.id, courseId, "declared");
+
+    const resolutions: Resolution[] = [
+      {
+        status: "near-miss",
+        scheduleName: "Augusta National Golf Club",
+        reason: "two courses read as this name",
+        candidates: ["AUGUSTA NATIONAL (GA)", "AUGUSTA MUNICIPAL (GA)"],
+      },
+      { status: "failed", scheduleName: "Augusta National Golf Club", reason: "a test" },
+    ];
+    for (const resolution of resolutions) {
+      const kept = await storePlan(db, {
+        outcomes: [{ tournament: t, resolution }],
+        rows: [],
+      });
+
+      expect(await linkOf(t.id)).toEqual({ courseId, match: "declared" });
+      expect(kept).toEqual([
+        {
+          tournamentId: t.id,
+          tournamentName: t.name,
+          courseId,
+          courseName: course.name,
+          courseMatch: "declared",
+          status: resolution.status,
+        },
+      ]);
+    }
+  });
+
+  it("moves the link when this run matches a different Course", async () => {
+    const t = await seedTournament("Relocated Open");
+    const courseA = await storeCourse(db, row());
+    await linkCourse(t.id, courseA, "exact");
+    const courseB = row();
+
+    const kept = await storePlan(db, {
+      outcomes: [
+        {
+          tournament: t,
+          resolution: {
+            status: "matched",
+            scheduleName: "Augusta National Golf Club",
+            confidence: "normalised",
+            openGolfApiId: courseB.openGolfApiId!,
+            openGolfApiName: courseB.name,
+          },
+        },
+      ],
+      rows: [courseB],
+    });
+
+    const [storedB] = await db
+      .select({ id: courses.id })
+      .from(courses)
+      .where(eq(courses.openGolfApiId, courseB.openGolfApiId!));
+    expect(storedB!.id).not.toBe(courseA);
+    expect(await linkOf(t.id)).toEqual({ courseId: storedB!.id, match: "normalised" });
+    expect(kept).toEqual([]);
+  });
+
+  it("reports no kept link for a Tournament that has none to keep", async () => {
+    const t = await seedTournament("Unlinked Open", null);
+    const kept = await storePlan(db, {
+      outcomes: [
+        {
+          tournament: t,
+          resolution: {
+            status: "failed",
+            scheduleName: null,
+            reason: "the schedule names no Course",
+          },
+        },
+      ],
+      rows: [],
+    });
+
+    expect(kept).toEqual([]);
+    expect(await linkOf(t.id)).toEqual({ courseId: null, match: null });
   });
 
   it("refuses a course_id that does not say how it was matched", async () => {
@@ -262,14 +407,6 @@ describe("storePlan, for a Course created from a Tournament's own article", () =
     rows,
   });
 
-  const linkOf = async (id: number) =>
-    (
-      await db
-        .select({ courseId: tournaments.courseId, match: tournaments.courseMatch })
-        .from(tournaments)
-        .where(eq(tournaments.id, id))
-    )[0]!;
-
   const namedCourses = async (name: string) =>
     db.select().from(courses).where(eq(courses.name, name));
 
@@ -330,24 +467,35 @@ describe("storePlan, for a Course created from a Tournament's own article", () =
     // page by clearing a Course an earlier run created from that same article.
     const skipped = planArticleCourses([{ ...t, coursePar: null }], new Set(), []);
     expect(skipped.skipped).toHaveLength(1);
-    await storePlan(db, plan, skipped);
+    const kept = await storePlan(db, plan, skipped);
 
     expect(await linkOf(t.id)).toEqual(linked);
+    expect(kept).toMatchObject([
+      { tournamentId: t.id, courseMatch: "tournament_article", status: "near-miss" },
+    ]);
   });
 
-  it("still clears a stale OpenGolfAPI match when the fallback is skipped", async () => {
+  // Replaces "still clears a stale OpenGolfAPI match when the fallback is skipped". A run that
+  // could not match on OpenGolfAPI and could not rebuild the Course from the article has
+  // learned nothing about whether the stored link is wrong, so it says nothing by clearing it.
+  it("keeps an OpenGolfAPI link an earlier run made when the fallback is skipped too", async () => {
     const t = await unmatchedTournament("Baycurrent Classic III");
-    const staleCourse = await storeCourse(db, row());
-    await db
-      .update(tournaments)
-      .set({ courseId: staleCourse, courseMatch: "normalised" })
-      .where(eq(tournaments.id, t.id));
+    const earlierLink = await storeCourse(db, row());
+    await linkCourse(t.id, earlierLink, "normalised");
 
     const skipped = planArticleCourses([{ ...t, coursePar: null }], new Set(), []);
     expect(skipped.venues).toEqual([]);
-    await storePlan(db, unmatchedPlan([t]), skipped);
+    const kept = await storePlan(db, unmatchedPlan([t]), skipped);
 
-    expect(await linkOf(t.id)).toMatchObject({ courseId: null, match: null });
+    expect(await linkOf(t.id)).toMatchObject({ courseId: earlierLink, match: "normalised" });
+    expect(kept).toMatchObject([
+      {
+        tournamentId: t.id,
+        courseId: earlierLink,
+        courseMatch: "normalised",
+        status: "near-miss",
+      },
+    ]);
   });
 
   // The second way one venue becomes two rows, and the one normalising has to catch: a Course

@@ -56,7 +56,9 @@ async function rowCount(): Promise<number> {
 }
 
 afterAll(async () => {
+  // Tournaments first: their `course_id` is a foreign key into the Courses seeded below.
   await sql`delete from tournaments where season = ${season}`;
+  await sql`delete from courses where name like ${`%Venue ${season}`}`;
   await sql.end();
 });
 
@@ -126,5 +128,119 @@ describe("re-ingesting", () => {
       course_par: null,
       course_article_url: "https://en.wikipedia.org/w/index.php?title=Test_Open&oldid=8",
     });
+  });
+});
+
+// The other half of #179's rule. `ingest:courses` keeps a link it could not re-confirm, which
+// is only safe if something clears a link to a venue the Tournament has left. This is that
+// something: it is the only place that sees both the stored Course name and the new one.
+describe("a Tournament whose venue changes", () => {
+  const revision = (oldid: number) =>
+    `https://en.wikipedia.org/w/index.php?title=Test_Invitational&oldid=${oldid}`;
+
+  /** A stored Tournament naming a Course, with a Course linked to it by hand. */
+  async function seedLinked(
+    name: string,
+  ): Promise<{ record: TournamentRecord; courseId: number }> {
+    const record: TournamentRecord = {
+      name,
+      season,
+      startDate: "2026-02-01",
+      endDate: "2026-02-04",
+      courseName: "First Country Club",
+      coursePar: 72,
+      courseYardage: 7100,
+      courseArticleUrl: revision(11),
+      location: "Florida",
+      source: "wikipedia",
+      sourceUrl: "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
+    };
+    await upsertTournaments(db, [record]);
+    const [course] = await sql<{ id: number }[]>`
+      insert into courses (name, source, source_url)
+      values (${`${name} Venue ${season}`}, 'wikipedia', 'https://en.wikipedia.org/wiki/Venue')
+      returning id`;
+    await sql`
+      update tournaments set course_id = ${course!.id}, course_match = 'declared'
+      where season = ${season} and name = ${name}`;
+    return { record, courseId: course!.id };
+  }
+
+  const linkOf = async (name: string) =>
+    (
+      await sql<{ course_id: number | null; course_match: string | null }[]>`
+        select course_id, course_match from tournaments
+        where season = ${season} and name = ${name}`
+    )[0]!;
+
+  const courseNameOf = async (name: string) =>
+    (
+      await sql<{ course_name: string | null }[]>`
+        select course_name from tournaments where season = ${season} and name = ${name}`
+    )[0]!.course_name;
+
+  it("clears both link columns where it writes a different Course name", async () => {
+    const { record, courseId } = await seedLinked("Moved Invitational");
+    expect(await linkOf(record.name)).toEqual({
+      course_id: courseId,
+      course_match: "declared",
+    });
+
+    await upsertTournaments(db, [
+      { ...record, courseName: "Second Country Club", courseArticleUrl: revision(12) },
+    ]);
+
+    // Both, together: `tournaments_course_match_is_recorded` would refuse one without the other.
+    expect(await linkOf(record.name)).toEqual({ course_id: null, course_match: null });
+    expect(await courseNameOf(record.name)).toBe("Second Country Club");
+  });
+
+  it("leaves the link alone where the Course name it writes is the one already stored", async () => {
+    const { record, courseId } = await seedLinked("Settled Invitational");
+    const link = { course_id: courseId, course_match: "declared" };
+
+    // A newer revision of the article, naming the same Course, and a date that moved.
+    await upsertTournaments(db, [
+      {
+        ...record,
+        startDate: "2026-02-02",
+        endDate: "2026-02-05",
+        courseArticleUrl: revision(12),
+      },
+    ]);
+    expect(await linkOf(record.name)).toEqual(link);
+
+    // And a run whose fetch of the article failed, which keeps the stored name — so it is not
+    // a venue change, and must not take the link with it.
+    await upsertTournaments(db, [
+      {
+        ...record,
+        courseName: null,
+        coursePar: null,
+        courseYardage: null,
+        courseArticleUrl: null,
+      },
+    ]);
+    expect(await linkOf(record.name)).toEqual(link);
+    expect(await courseNameOf(record.name)).toBe("First Country Club");
+  });
+
+  // An article that was read and names no Course clears `course_name`, so the link goes with
+  // it: `is distinct from` treats a name becoming null as the change it is.
+  it("clears the link where the article read now names no Course at all", async () => {
+    const { record } = await seedLinked("Vacated Invitational");
+
+    await upsertTournaments(db, [
+      {
+        ...record,
+        courseName: null,
+        coursePar: null,
+        courseYardage: null,
+        courseArticleUrl: revision(13),
+      },
+    ]);
+
+    expect(await linkOf(record.name)).toEqual({ course_id: null, course_match: null });
+    expect(await courseNameOf(record.name)).toBeNull();
   });
 });
