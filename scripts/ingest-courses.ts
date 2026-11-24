@@ -10,8 +10,10 @@
 //
 // A match is by name, within the Tournament's state where it has one, and only when it is
 // certain; anything less falls back to the Course the Tournament's own article names, and
-// failing that is left null and listed at the end, with the name as the schedule wrote it. See
-// lib/courses/match.ts for the rules and lib/courses/from-tournament.ts for the fallback.
+// failing that leaves whatever is linked alone — an earlier run's link, or nothing — and is
+// listed at the end, with the name as the schedule wrote it. See lib/courses/match.ts for the
+// rules, lib/courses/from-tournament.ts for the fallback, and lib/opengolfapi/store.ts for why
+// a link this run could not re-confirm is kept rather than cleared.
 //
 // Nothing is written until every request has been made. A run that would need more requests
 // than OpenGolfAPI has left today stops, says how far it got, writes nothing and exits
@@ -32,7 +34,7 @@ import {
   type CoursePlan,
   type TournamentOutcome,
 } from "../lib/opengolfapi/ingest";
-import { storePlan } from "../lib/opengolfapi/store";
+import { storePlan, type KeptLink } from "../lib/opengolfapi/store";
 
 function listUnmatched(title: string, outcomes: TournamentOutcome[]) {
   if (outcomes.length === 0) return;
@@ -76,6 +78,21 @@ function reportArticleCourses(fromArticles: ArticleCoursePlan) {
   if (skipped.length > 0) {
     console.log(`\nNo Course from their own article either (${skipped.length}):`);
     for (const skip of skipped) console.log(`  ${skip.tournamentName}: ${skip.reason}`);
+  }
+}
+
+/**
+ * The links this run left standing without re-confirming them. Worth a line each: the Course a
+ * Tournament is ranked against is the one named here, and nothing this run did checked it.
+ */
+function reportKeptLinks(kept: readonly KeptLink[]) {
+  if (kept.length === 0) return;
+  console.log(`\nLinks kept as they were (${kept.length}):`);
+  for (const link of kept) {
+    console.log(
+      `  Kept ${link.tournamentName}'s link to ${link.courseName}: this run could not ` +
+        `re-confirm it (${link.status}). Stored match: ${link.courseMatch}.`,
+    );
   }
 }
 
@@ -151,7 +168,7 @@ async function main() {
       ),
       [...known.values()],
     );
-    await storePlan(db, plan, fromArticles);
+    const kept = await storePlan(db, plan, fromArticles);
 
     const matched = plan.outcomes.filter((o) => o.resolution.status === "matched");
     console.log(`\nMatched (${matched.length}):`);
@@ -175,6 +192,7 @@ async function main() {
     );
 
     reportArticleCourses(fromArticles);
+    reportKeptLinks(kept);
 
     console.log("\nCourses fetched:");
     for (const row of plan.rows) {
