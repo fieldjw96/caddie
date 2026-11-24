@@ -7,7 +7,7 @@ import { sql } from "drizzle-orm";
 import type { db as dbClient } from "../../db/client";
 import { tournaments } from "../../db/schema";
 import { extractTournamentCourse, type TournamentCourseFacts } from "./course-name";
-import type { ScheduleRow } from "./parse";
+import type { NamedScheduleRow, ScheduleRow } from "./parse";
 import { fetchArticle, revisionUrl } from "./wikipedia";
 
 type Database = typeof dbClient;
@@ -40,9 +40,9 @@ export interface TournamentRecord {
 
 /**
  * Parsed rows, each Tournament article's venue facts, and the revision the season's schedule
- * was read at, turned into the rows this Ticket writes. Canceled tournaments are dropped here,
- * after being counted by the caller: a tournament that did not happen is not one to rank a
- * Course fit for.
+ * was read at, turned into the rows this Ticket writes. Canceled tournaments and placeholder
+ * rows (no Tournament named yet) are dropped here, after being counted by the caller: a
+ * tournament that did not happen, or does not yet exist, is not one to rank a Course fit for.
  *
  * A Tournament whose article could not be read gets nulls and no revision URL, which is how
  * `upsertTournaments` knows to leave whatever an earlier run stored alone.
@@ -54,7 +54,7 @@ export function buildTournamentRecords(
   courseFacts: ReadonlyMap<string, TournamentArticleCourse>,
 ): TournamentRecord[] {
   return rows
-    .filter((row) => !row.canceled)
+    .filter((row): row is NamedScheduleRow => !row.canceled && !row.placeholder)
     .map((row) => {
       const facts = courseFacts.get(row.pageTitle) ?? null;
       return {

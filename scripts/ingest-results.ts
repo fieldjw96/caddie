@@ -30,7 +30,7 @@ import { defaultSeasons, enoughEvents, eventArticles } from "../lib/results/seas
 import { PLAYOFFS_TABLE, readPlayoffs } from "../lib/results/playoffs";
 import { readStandings } from "../lib/results/standings";
 import type { EventFailure } from "../lib/results/types";
-import { parseSchedule } from "../lib/schedule/parse";
+import { parseSchedule, type NamedScheduleRow } from "../lib/schedule/parse";
 import {
   fetchArticle,
   fetchSection,
@@ -111,7 +111,11 @@ async function ingestSeason(
 
   // The playoffs table goes in before the standings table: for the three playoff events it is
   // the whole field and the finish as printed, where the standings table has only the top 30.
-  const playedOn = new Map(scheduleRows.map((row) => [row.pageTitle, row.endDate < today]));
+  const playedOn = new Map(
+    scheduleRows
+      .filter((row): row is NamedScheduleRow => !row.placeholder)
+      .map((row) => [row.pageTitle, row.endDate < today]),
+  );
   const playoffsTitle = `${season} FedEx Cup Playoffs`;
   let playoffsUrl: string | null = null;
   let playoffsNotYetPlayed: string[] = [];
@@ -160,7 +164,9 @@ async function ingestSeason(
 
   // A dry run first, against the schedule rather than the database, so that a season refused
   // below has written nothing at all, Tournaments included. The row numbers stand in for ids.
-  const scheduled = scheduleRows.filter((row) => !row.canceled);
+  const scheduled = scheduleRows.filter(
+    (row): row is NamedScheduleRow => !row.canceled && !row.placeholder,
+  );
   const dryRun = buildResultRecords(
     events,
     new Map(scheduled.map((row, i) => [row.pageTitle, i])),

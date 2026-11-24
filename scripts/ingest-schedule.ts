@@ -12,7 +12,7 @@ import {
   resolveCourseFacts,
   upsertTournaments,
 } from "../lib/schedule/ingest";
-import { parseSchedule } from "../lib/schedule/parse";
+import { parseSchedule, type NamedScheduleRow } from "../lib/schedule/parse";
 import {
   currentSeasonYear,
   parseRegularSeasonRange,
@@ -41,9 +41,13 @@ async function ingestSeason(season: number): Promise<SeasonOutcome | null> {
   const section = await fetchSection(title, "Schedule");
   const rows = parseSchedule(section.wikitext, season);
   const canceled = rows.filter((row) => row.canceled);
-  const active = rows.filter((row) => !row.canceled);
+  const placeholders = rows.filter((row) => !row.canceled && row.placeholder);
+  const active = rows.filter(
+    (row): row is NamedScheduleRow => !row.canceled && !row.placeholder,
+  );
   console.log(
-    `Parsed ${rows.length} rows (${canceled.length} canceled, ${active.length} to ingest).`,
+    `Parsed ${rows.length} rows (${canceled.length} canceled, ${placeholders.length} not ` +
+      `yet named, ${active.length} to ingest).`,
   );
 
   if (active.length < MINIMUM_TOURNAMENTS) {

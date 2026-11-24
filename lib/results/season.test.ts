@@ -3,7 +3,19 @@ import type { ScheduleRow } from "../schedule/parse";
 import { defaultSeasons, enoughEvents, eventArticles } from "./season";
 
 function row(pageTitle: string, endDate: string, canceled = false): ScheduleRow {
-  return { name: pageTitle, pageTitle, startDate: endDate, endDate, location: null, canceled };
+  return {
+    placeholder: false,
+    name: pageTitle,
+    pageTitle,
+    startDate: endDate,
+    endDate,
+    location: null,
+    canceled,
+  };
+}
+
+function placeholderRow(endDate: string): ScheduleRow {
+  return { placeholder: true, startDate: endDate, endDate, location: null, canceled: false };
 }
 
 const schedule2026: ScheduleRow[] = [
@@ -42,6 +54,16 @@ describe("eventArticles", () => {
     const { played, notYetPlayed } = eventArticles(schedule2026, 2026, "2026-12-31");
     expect([...played, ...notYetPlayed]).not.toContain("Genesis Invitational");
     expect([...played, ...notYetPlayed]).not.toContain("2026 Canceled Invitational");
+  });
+
+  it("ignores a placeholder row, which names no article to read", () => {
+    const { played, notYetPlayed } = eventArticles(
+      [...schedule2026, placeholderRow("2026-02-21")],
+      2026,
+      "2026-09-22",
+    );
+    expect(played).toHaveLength(3);
+    expect(notYetPlayed).toHaveLength(2);
   });
 
   it("reads another season's articles only for that season", () => {
