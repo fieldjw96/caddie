@@ -27,7 +27,7 @@ const DATA: PageData = {
     startDate: "2026-11-01",
     endDate: "2026-11-04",
     courseName: "Bay Hill Club and Lodge",
-    sourceUrl: "https://en.wikipedia.org/w/index.php?title=2027_PGA_Tour&oldid=1",
+    sourceUrl: "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
   },
   skipped: [],
   course: TRUSTED_COURSE,
