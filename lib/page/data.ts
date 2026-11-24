@@ -4,6 +4,7 @@
 // gaps are shown rather than hidden: the product's claim is that it shows its working.
 
 import type { Source } from "../../db/schema";
+import { declaredFor, scheduledCourses } from "../courses/match";
 import type { FitCourseTraits, FitTraitName } from "../fit";
 
 /** One Strength as the page shows it: the value, and always the sample it rests on. */
@@ -153,10 +154,16 @@ export interface PageData {
 }
 
 /**
- * The Course a Tournament is played on. The Tournament's own `courseId` where one is stored;
- * otherwise a Course whose name is the Tournament's venue exactly, ignoring case and spacing.
- * Anything looser would be a guess, and a wrong Course would make every number below it wrong,
- * so no match is an answer the page states rather than one it papers over.
+ * The Course a Tournament is played on, tried in order and stopped at the first name found by
+ * exactly one stored Course: (1) the Tournament's own `courseId`; (2) the declared pairing's
+ * OpenGolfAPI name, for a `courseName` `lib/courses/match.ts` has a hand-read pairing for; (3)
+ * each qualified name `scheduledCourses` reads from `courseName`, such as "Sea Island Golf Club
+ * Seaside Course"; (4) each distinct club `scheduledCourses` returns, such as "Sea Island Golf
+ * Club" alone. This is what lets a multi-course schedule entry match a stored Course by a name
+ * nearer to OpenGolfAPI's own than the raw schedule string ever reads. Anything looser than an
+ * exact name would be a guess, and a wrong Course would make every number below it wrong, so a
+ * name reached at any step that two stored Courses share ends the whole search with null rather
+ * than falling through to the next one.
  */
 export function matchCourse<C extends { id: number; name: string }>(
   tournament: { courseId: number | null; courseName: string | null },
@@ -166,10 +173,55 @@ export function matchCourse<C extends { id: number; name: string }>(
     return courses.find((c) => c.id === tournament.courseId) ?? null;
   }
   if (tournament.courseName === null) return null;
+
   const key = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
-  const wanted = key(tournament.courseName);
-  const matches = courses.filter((c) => key(c.name) === wanted);
-  return matches.length === 1 ? matches[0]! : null;
+  /** The one Course `name` reads as, `undefined` for none, or `null` for more than one. */
+  const byName = (name: string): C | null | undefined => {
+    const wanted = key(name);
+    const matches = courses.filter((c) => key(c.name) === wanted);
+    if (matches.length > 1) return null;
+    return matches[0];
+  };
+
+  const declared = declaredFor(tournament.courseName);
+  const listed = scheduledCourses(tournament.courseName);
+  const names = [
+    ...(declared ? [declared.name] : []),
+    ...listed.map((c) => c.name),
+    ...new Set(listed.map((c) => c.club)),
+  ];
+  for (const name of names) {
+    const found = byName(name);
+    if (found === null) return null;
+    if (found !== undefined) return found;
+  }
+  return null;
+}
+
+/**
+ * A schedule's `course_name` rendered for reading rather than for matching: each club followed
+ * by its listed courses in words, e.g. "Sea Island Golf Club (Seaside Course and Plantation
+ * Course)". A name `scheduledCourses` reads as one course is returned as that course's own
+ * name, unchanged. CONTEXT.md avoids "venue" for a Course, hence this name rather than that one.
+ */
+export function scheduledCourseLabel(courseName: string): string {
+  const listed = scheduledCourses(courseName);
+  const [only] = listed;
+  if (listed.length <= 1) return only?.name ?? courseName.trim();
+
+  const groups: { club: string; names: string[] }[] = [];
+  for (const { club, name } of listed) {
+    const group = groups.find((g) => g.club === club);
+    if (group) group.names.push(name);
+    else groups.push({ club, names: [name] });
+  }
+  return listInWords(
+    groups.map((g) => {
+      if (g.names.length === 1) return g.names[0]!;
+      const qualifiers = g.names.map((name) => name.slice(g.club.length).trim());
+      return `${g.club} (${listInWords(qualifiers)})`;
+    }),
+  );
 }
 
 /**

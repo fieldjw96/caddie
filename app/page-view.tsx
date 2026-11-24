@@ -11,6 +11,7 @@ import {
   formatFreshnessDate,
   holesUnavailableReason,
   isStale,
+  scheduledCourseLabel,
   type PageData,
 } from "../lib/page/data";
 import { ROSTER_WINDOW_MONTHS } from "../lib/roster";
@@ -241,7 +242,9 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
           </h1>
           <p className="mt-3 font-display text-xl font-semibold tracking-[0.04em] text-highlight uppercase sm:text-2xl">
             {formatDates(tournament.startDate, tournament.endDate)}
-            {courseName ? `, at ${courseName}` : ", at a Course not yet known to us"}
+            {courseName
+              ? `, at ${scheduledCourseLabel(courseName)}`
+              : ", at a Course not yet known to us"}
           </p>
         </div>
       </header>
