@@ -490,6 +490,17 @@ export function formatDates(startDate: string, endDate: string): string {
 }
 
 /**
+ * The whole UTC calendar days from `now` until `startDate`: 0 on the day it starts, negative
+ * once the Tournament is already under way. Compares calendar days rather than elapsed time,
+ * so the answer does not depend on what hour `now` happens to carry.
+ */
+export function daysUntil(startDate: string, now: Date): number {
+  const start = new Date(`${startDate}T00:00:00Z`).getTime();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((start - today) / (24 * 60 * 60 * 1000));
+}
+
+/**
  * The dates and course for the heading, with location appended when non-null.
  * E.g., "18–23 November 2026, at Sea Island Golf Club, Georgia" or
  * "18–23 November 2026, at a Course not yet known to us" when no course is matched.

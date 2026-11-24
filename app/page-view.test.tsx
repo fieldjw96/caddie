@@ -13,20 +13,22 @@ import {
   UNTRUSTED_COURSE,
   UNTRUSTED_TRAITS,
 } from "../lib/page/fixtures";
+import { ROSTER_WINDOW_MONTHS } from "../lib/roster";
 import { LICENCES, PageView } from "./page-view";
 
 // Fixed so the freshness tests below do not depend on when they happen to run.
 const NOW = new Date("2026-10-28T12:00:00Z");
 
+// Four days after NOW: within the "this week" threshold, so today's copy applies.
 const DATA: PageData = {
   tournament: {
     name: "Arnold Palmer Invitational",
-    season: 2027,
-    startDate: "2027-03-04",
-    endDate: "2027-03-07",
+    season: 2026,
+    startDate: "2026-11-01",
+    endDate: "2026-11-04",
     courseName: "Bay Hill Club and Lodge",
     location: null,
-    sourceUrl: "https://en.wikipedia.org/w/index.php?title=2027_PGA_Tour&oldid=1",
+    sourceUrl: "https://en.wikipedia.org/w/index.php?title=2026_PGA_Tour&oldid=1",
   },
   skipped: [],
   course: TRUSTED_COURSE,
@@ -104,7 +106,7 @@ describe("PageView, rendered on the server", () => {
   it("states the Tournament, its dates and its Course", () => {
     const t = text(DATA);
     expect(t).toContain("Arnold Palmer Invitational");
-    expect(t).toContain("4–7 March 2027");
+    expect(t).toContain("1–4 November 2026");
     expect(t).toContain("Bay Hill Club and Lodge");
   });
 
@@ -358,5 +360,52 @@ describe("PageView, rendered on the server", () => {
     expect(t).not.toContain("not the soonest Tournament");
     expect(t).toContain("The next PGA Tour Tournament");
     expect(t).not.toContain("The next PGA Tour Tournament we can rank");
+  });
+
+  it("says the Field is assumed and entered this week when the Tournament starts within 6 days", () => {
+    const t = text(DATA);
+    expect(t).toContain("The field is assumed, not confirmed.");
+    expect(t).toContain("Players actually entered this week.");
+    expect(t).toContain("says nothing about where anyone finishes this week.");
+  });
+});
+
+describe("PageView, weeks from the next Tournament", () => {
+  /** `days` whole calendar days after `NOW`, as a `YYYY-MM-DD`. */
+  const daysLater = (days: number) =>
+    new Date(NOW.getTime() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const FAR: PageData = {
+    ...DATA,
+    tournament: { ...DATA.tournament, startDate: daysLater(61), endDate: daysLater(64) },
+  };
+
+  it("names how far off it is, drops 'this week', and says no Field exists yet, with nothing skipped", () => {
+    const data: PageData = { ...FAR, skipped: [] };
+    const t = text(data);
+    expect(t).not.toContain("this week");
+    expect(t).toContain("The next PGA Tour Tournament, in 9 weeks");
+    expect(t).toMatch(/no field/i);
+    expect(t).toContain(`stored result in the last ${ROSTER_WINDOW_MONTHS} months`);
+    expect(t).toContain("No PGA Tour Tournament is played before this one.");
+  });
+
+  it("makes no claim that nothing is played before it, when a Tournament was skipped", () => {
+    const data: PageData = { ...FAR, skipped: [SKIPPED_BERMUDA] };
+    const t = text(data);
+    expect(t).not.toContain("this week");
+    expect(t).toMatch(/no field/i);
+    expect(t).toContain(`stored result in the last ${ROSTER_WINDOW_MONTHS} months`);
+    expect(t).not.toContain("No PGA Tour Tournament is played before this one.");
+  });
+
+  it("leaves the band label unqualified and keeps today's copy within 6 days", () => {
+    const data: PageData = {
+      ...DATA,
+      tournament: { ...DATA.tournament, startDate: daysLater(6), endDate: daysLater(9) },
+    };
+    const t = text(data);
+    expect(t).toContain("Players actually entered this week.");
+    expect(t).not.toMatch(/The next PGA Tour Tournament, in \d+ weeks?/);
   });
 });
