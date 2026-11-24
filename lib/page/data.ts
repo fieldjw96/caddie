@@ -501,7 +501,9 @@ export function formatDatesAndCourse(
   location: string | null,
 ): string {
   const dates = formatDates(startDate, endDate);
-  const courseClause = courseName ? `at ${courseName}` : "at a Course not yet known to us";
+  const courseClause = courseName
+    ? `at ${scheduledCourseLabel(courseName)}`
+    : "at a Course not yet known to us";
   const locationClause = location ? `, ${location}` : "";
   return `${dates}, ${courseClause}${locationClause}`;
 }
