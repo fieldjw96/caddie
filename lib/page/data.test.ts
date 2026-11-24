@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DECLARED_MATCHES } from "../courses/match";
 import { fitScore, normalise, TRAIT_SCALES } from "../fit";
 import {
   classifyCoverageEditions,
@@ -12,6 +13,7 @@ import {
   matchCourse,
   holesUnavailableReason,
   parUnavailableReason,
+  scheduledCourseLabel,
 } from "./data";
 import {
   TRUSTED_COURSE,
@@ -48,6 +50,108 @@ describe("matchCourse", () => {
     expect(matchCourse({ courseId: null, courseName: "Bay Hill" }, courses)).toBeNull();
     expect(matchCourse({ courseId: null, courseName: null }, courses)).toBeNull();
   });
+
+  for (const declared of DECLARED_MATCHES) {
+    it(`matches ${JSON.stringify(declared.schedule)} to its declared Course by name`, () => {
+      const stocked = [
+        { id: 1, name: declared.name },
+        { id: 2, name: "Some Other Club" },
+      ];
+      expect(matchCourse({ courseId: null, courseName: declared.schedule }, stocked)?.id).toBe(
+        1,
+      );
+    });
+  }
+
+  it("matches the qualified name of one course of a multi-course schedule entry", () => {
+    const stocked = [
+      { id: 1, name: "Torrey Pines Golf Course South Course" },
+      { id: 2, name: "Torrey Pines Golf Course North Course" },
+    ];
+    expect(
+      matchCourse(
+        {
+          courseId: null,
+          courseName: "Torrey Pines Golf Course, (South Course), (North Course)",
+        },
+        stocked,
+      )?.id,
+    ).toBe(1);
+  });
+
+  it("falls back to a distinct club scheduledCourses returns when no qualified name matches", () => {
+    // Neither the declared name ("Torrey Pines South Course") nor either qualified name
+    // ("Torrey Pines Golf Course South/North Course") reads as the one stored row below, so
+    // only step (4), the bare club, reaches it.
+    const stocked = [{ id: 1, name: "Torrey Pines Golf Course" }];
+    expect(
+      matchCourse(
+        {
+          courseId: null,
+          courseName: "Torrey Pines Golf Course, (South Course), (North Course)",
+        },
+        stocked,
+      )?.id,
+    ).toBe(1);
+  });
+
+  it("matches nothing when two stored Courses share a name reached at the declared step", () => {
+    const declared = DECLARED_MATCHES[0]!;
+    const stocked = [
+      { id: 1, name: declared.name },
+      { id: 2, name: declared.name },
+    ];
+    expect(matchCourse({ courseId: null, courseName: declared.schedule }, stocked)).toBeNull();
+  });
+
+  it("matches nothing when two stored Courses share a name reached at the club step", () => {
+    const stocked = [
+      { id: 1, name: "Torrey Pines Golf Course" },
+      { id: 2, name: "Torrey Pines Golf Course" },
+    ];
+    expect(
+      matchCourse(
+        {
+          courseId: null,
+          courseName: "Torrey Pines Golf Course, (South Course), (North Course)",
+        },
+        stocked,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("scheduledCourseLabel", () => {
+  it("renders one club's several listed courses in words", () => {
+    expect(
+      scheduledCourseLabel("Sea Island Golf Club, (Seaside Course), (Plantation Course)"),
+    ).toBe("Sea Island Golf Club (Seaside Course and Plantation Course)");
+    expect(
+      scheduledCourseLabel("Torrey Pines Golf Course, (South Course), (North Course)"),
+    ).toBe("Torrey Pines Golf Course (South Course and North Course)");
+  });
+
+  it("joins two distinct clubs by name, not by qualifier", () => {
+    expect(
+      scheduledCourseLabel("{{nowrap|Pebble Beach Golf Links, Spyglass Hill Golf Course}}"),
+    ).toBe("Pebble Beach Golf Links and Spyglass Hill Golf Course");
+  });
+
+  it("returns a single scheduled course's own name unchanged", () => {
+    expect(scheduledCourseLabel("Black Desert Resort")).toBe("Black Desert Resort");
+    expect(scheduledCourseLabel("TPC Sawgrass, (Stadium Course)")).toBe(
+      "TPC Sawgrass Stadium Course",
+    );
+  });
+
+  for (const declared of DECLARED_MATCHES) {
+    it(`renders ${JSON.stringify(declared.schedule)} with no leftover markup`, () => {
+      const label = scheduledCourseLabel(declared.schedule);
+      expect(label).not.toContain("{{");
+      expect(label).not.toContain("}}");
+      expect(label).not.toContain(", (");
+    });
+  }
 });
 
 describe("courseProfile", () => {
