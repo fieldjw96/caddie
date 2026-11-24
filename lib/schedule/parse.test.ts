@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isolateOfficialScheduleTable, parseSchedule } from "./parse";
+import {
+  isolateOfficialScheduleTable,
+  parseSchedule,
+  PLACEHOLDER_TOURNAMENT_TEXTS,
+} from "./parse";
 
 const SECTION_WIKITEXT = `The following table lists official events during the 2026 season.<ref>...</ref>
 
@@ -159,7 +163,60 @@ describe("parseSchedule", () => {
     expect(() => parseSchedule(brokenLink, 2026)).toThrow(/Tournament.*wikilink/);
   });
 
+  it("still throws on plain text that is not a listed placeholder either", () => {
+    const plainText = SECTION_WIKITEXT.replace(
+      "|[[Sony Open in Hawaii]]",
+      "|Some Invitational",
+    );
+    expect(() => parseSchedule(plainText, 2026)).toThrow(/Tournament.*wikilink/);
+  });
+
   it("throws when the section has no wikitable at all", () => {
     expect(() => parseSchedule("Nothing but prose here.", 2026)).toThrow(/no wikitable/);
+  });
+});
+
+describe("parseSchedule: a Tournament not yet named", () => {
+  it.each(PLACEHOLDER_TOURNAMENT_TEXTS)(
+    "treats a bare %s as a placeholder, case-insensitively",
+    (text) => {
+      const section = SECTION_WIKITEXT.replace(
+        "|Jan 18\n|[[Sony Open in Hawaii]]",
+        `|Jan 18\n|${text.toUpperCase()}`,
+      );
+      const rows = parseSchedule(section, 2026);
+      expect(rows[1]).toEqual({
+        placeholder: true,
+        startDate: "2026-01-15",
+        endDate: "2026-01-18",
+        location: "Hawaii",
+        canceled: false,
+      });
+    },
+  );
+
+  it("returns a placeholder row instead of throwing for '' TBD '' as the 2027 article writes it", () => {
+    const section = SECTION_WIKITEXT.replace(
+      "|Jan 18\n|[[Sony Open in Hawaii]]",
+      "|Feb 21\n|''TBD''",
+    );
+    const rows = parseSchedule(section, 2026);
+    expect(rows[1]).toEqual({
+      placeholder: true,
+      startDate: "2026-02-18",
+      endDate: "2026-02-21",
+      location: "Hawaii",
+      canceled: false,
+    });
+  });
+
+  it("never invents a name or pageTitle for a placeholder row", () => {
+    const section = SECTION_WIKITEXT.replace(
+      "|Jan 18\n|[[Sony Open in Hawaii]]",
+      "|Feb 21\n|''TBD''",
+    );
+    const rows = parseSchedule(section, 2026);
+    expect(rows[1]).not.toHaveProperty("name");
+    expect(rows[1]).not.toHaveProperty("pageTitle");
   });
 });

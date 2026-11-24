@@ -8,7 +8,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { db as dbClient } from "../../db/client";
 import { results, tournaments, type ResultBasis } from "../../db/schema";
-import type { ScheduleRow } from "../schedule/parse";
+import type { NamedScheduleRow, ScheduleRow } from "../schedule/parse";
 import type { PlayerIndex } from "./names";
 import type { EventResults } from "./types";
 
@@ -116,7 +116,9 @@ export async function ensureTournaments(
   season: number,
   sourceUrl: string,
 ): Promise<Map<string, number>> {
-  const active = rows.filter((row) => !row.canceled);
+  const active = rows.filter(
+    (row): row is NamedScheduleRow => !row.canceled && !row.placeholder,
+  );
   if (active.length === 0) return new Map();
   await database
     .insert(tournaments)

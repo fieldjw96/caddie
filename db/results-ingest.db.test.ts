@@ -35,6 +35,7 @@ beforeAll(async () => {
     db,
     [
       {
+        placeholder: false,
         name: "Results Test Open",
         pageTitle: `${season} Results Test Open`,
         startDate: "2025-04-10",
@@ -43,6 +44,7 @@ beforeAll(async () => {
         canceled: false,
       },
       {
+        placeholder: false,
         name: "Canceled Classic",
         pageTitle: "Canceled Classic",
         startDate: "2025-04-17",
@@ -96,6 +98,7 @@ describe("ensureTournaments", () => {
       db,
       [
         {
+          placeholder: false,
           name: "Results Test Open",
           pageTitle: `${season} Results Test Open`,
           startDate: "2025-04-10",
