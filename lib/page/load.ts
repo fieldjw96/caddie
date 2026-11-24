@@ -54,6 +54,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
       endDate: tournaments.endDate,
       courseName: tournaments.courseName,
       courseId: tournaments.courseId,
+      location: tournaments.location,
       sourceUrl: tournaments.sourceUrl,
     })
     .from(tournaments);
@@ -187,6 +188,7 @@ export async function loadPageData(now: Date): Promise<PageData | null> {
       startDate: next.startDate,
       endDate: next.endDate,
       courseName: next.courseName,
+      location: next.location,
       sourceUrl: next.sourceUrl,
     },
     skipped,

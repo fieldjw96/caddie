@@ -7,11 +7,10 @@ import {
   coverageSentences,
   daysUntil,
   fitTraits,
-  formatDates,
+  formatDatesAndCourse,
   formatFreshnessDate,
   holesUnavailableReason,
   isStale,
-  scheduledCourseLabel,
   type PageData,
 } from "../lib/page/data";
 import { ROSTER_WINDOW_MONTHS } from "../lib/roster";
@@ -208,7 +207,7 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
   }
 
   const { tournament, skipped, course, traits, players, coverage } = data;
-  const profile = courseProfile(course, traits);
+  const profile = courseProfile(course, traits, tournament.location);
   const hasVenue = players.some((p) => p.venueRecord !== null && p.venueRecord.value !== null);
   const courseName = course?.name ?? tournament.courseName;
   const holesTrusted = course?.holesTrusted === true;
@@ -241,10 +240,12 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
             {tournament.name}
           </h1>
           <p className="mt-3 font-display text-xl font-semibold tracking-[0.04em] text-highlight uppercase sm:text-2xl">
-            {formatDates(tournament.startDate, tournament.endDate)}
-            {courseName
-              ? `, at ${scheduledCourseLabel(courseName)}`
-              : ", at a Course not yet known to us"}
+            {formatDatesAndCourse(
+              tournament.startDate,
+              tournament.endDate,
+              courseName,
+              tournament.location,
+            )}
           </p>
         </div>
       </header>

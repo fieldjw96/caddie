@@ -27,6 +27,7 @@ const DATA: PageData = {
     startDate: "2027-03-04",
     endDate: "2027-03-07",
     courseName: "Bay Hill Club and Lodge",
+    location: null,
     sourceUrl: "https://en.wikipedia.org/w/index.php?title=2027_PGA_Tour&oldid=1",
   },
   skipped: [],
