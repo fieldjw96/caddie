@@ -123,7 +123,8 @@ production.
 ## Is production working
 
 The checks below read the source tree, and they can all pass while the deployed site returns
-an error to every reader. On 2026-09-22 that is what happened. Three workflows address it:
+an error to every reader. On 2026-09-22 that is what happened. Three workflows and one route
+address it:
 
 - `.github/workflows/smoke.yml` asks production itself. It runs after every Production
   deployment, every hour and by hand. It requires HTTP 200, a Tournament named in the page's
@@ -160,6 +161,18 @@ an error to every reader. On 2026-09-22 that is what happened. Three workflows a
 
   The daily ingest runs this same workflow as its first job, and its later stages wait for
   it, so the ingest never writes to a schema older than `main`.
+
+- `/api/health` asks production directly, for the question none of the above can see: a
+  healthy connection to a populated database whose homepage still has no answer. Its `rankable`
+  object reports `state` (`"rankable"`, `"unrankable"` or `"no-next-tournament"`), the
+  `tournament` and `course` the homepage would actually render — chosen the same way the page
+  itself falls forward past an unrankable one, see #154 — `courseTraitCount`,
+  `anyPlayerHasStrength`, and `reason`, `checkRankable`'s own words for why an `"unrankable"`
+  Tournament fails, or `null` otherwise. When the page falls forward past the true next
+  Tournament to reach the one it renders, the object also names that true next one as
+  `trueNextTournament`. Top-level `ok`, `stage` and the HTTP status still describe only the
+  database connection: an unrankable Tournament behind a healthy connection is still `200` and
+  `ok: true`, because this is a page gap to disclose, not an outage to page anyone for.
 
 ## Deploying
 
