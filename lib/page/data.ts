@@ -35,6 +35,8 @@ export interface TournamentView {
   endDate: string;
   /** The venue as the Source writes it, kept even when no Course is matched. */
   courseName: string | null;
+  /** The schedule's Location: a US state or a country. */
+  location: string | null;
   sourceUrl: string | null;
 }
 
@@ -312,7 +314,11 @@ export function parUnavailableReason(course: CourseView | null): string {
  * The Course Profile, in the Traits' natural units, in the order a reader asks about a
  * Course. Every line is present whether or not it is known: an unknown Trait says why.
  */
-export function courseProfile(course: CourseView | null, traits: StoredTraits): ProfileLine[] {
+export function courseProfile(
+  course: CourseView | null,
+  traits: StoredTraits,
+  location: string | null = null,
+): ProfileLine[] {
   const noCourse = "No Course is matched to this Tournament, so none of its facts are held.";
   const holes = holesUnavailableReason(course);
   const parMix = parUnavailableReason(course);
@@ -320,6 +326,11 @@ export function courseProfile(course: CourseView | null, traits: StoredTraits): 
   const t = (name: string) => traits[name]?.value;
 
   const lines: ProfileLine[] = [];
+
+  if (location !== null) {
+    lines.push({ label: "Location", value: location });
+  }
+
   const length = t("length_yards");
   const adjustedLength = t("altitude_adjusted_length_yards");
   lines.push(
@@ -476,6 +487,25 @@ export function formatDates(startDate: string, endDate: string): string {
     return `${day(start)} ${month(start)} – ${day(end)} ${month(end)} ${year(end)}`;
   }
   return `${day(start)}–${day(end)} ${month(end)} ${year(end)}`;
+}
+
+/**
+ * The dates and course for the heading, with location appended when non-null.
+ * E.g., "18–23 November 2026, at Sea Island Golf Club, Georgia" or
+ * "18–23 November 2026, at a Course not yet known to us" when no course is matched.
+ */
+export function formatDatesAndCourse(
+  startDate: string,
+  endDate: string,
+  courseName: string | null,
+  location: string | null,
+): string {
+  const dates = formatDates(startDate, endDate);
+  const courseClause = courseName
+    ? `at ${scheduledCourseLabel(courseName)}`
+    : "at a Course not yet known to us";
+  const locationClause = location ? `, ${location}` : "";
+  return `${dates}, ${courseClause}${locationClause}`;
 }
 
 /** A list in prose: "A", "A and B", "A, B and C". */

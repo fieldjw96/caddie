@@ -7,6 +7,7 @@ import {
   coverageSentences,
   fitTraits,
   formatDates,
+  formatDatesAndCourse,
   formatFreshnessDate,
   isStale,
   matchCourse,
@@ -283,6 +284,19 @@ describe("courseProfile", () => {
     const lines = courseProfile(null, {});
     expect(lines.every((l) => l.value === null)).toBe(true);
   });
+
+  it("includes Location when passed and non-null", () => {
+    const lines = courseProfile(TRUSTED_COURSE, TRUSTED_TRAITS, "Georgia");
+    const location = lines.find((l) => l.label === "Location");
+    expect(location?.value).toBe("Georgia");
+  });
+
+  it("omits Location when not passed or null", () => {
+    const linesWithoutLocation = courseProfile(TRUSTED_COURSE, TRUSTED_TRAITS, null);
+    const linesWithoutParam = courseProfile(TRUSTED_COURSE, TRUSTED_TRAITS);
+    expect(linesWithoutLocation.find((l) => l.label === "Location")).toBeUndefined();
+    expect(linesWithoutParam.find((l) => l.label === "Location")).toBeUndefined();
+  });
 });
 
 describe("fitTraits", () => {
@@ -400,6 +414,32 @@ describe("formatDates", () => {
   it("reads a week in one month, and one across two", () => {
     expect(formatDates("2026-09-24", "2026-09-27")).toBe("24–27 September 2026");
     expect(formatDates("2026-09-30", "2026-10-03")).toBe("30 September – 3 October 2026");
+  });
+});
+
+describe("formatDatesAndCourse", () => {
+  it("appends location to the dates and course when non-null", () => {
+    expect(
+      formatDatesAndCourse("2026-11-18", "2026-11-23", "Sea Island Golf Club", "Georgia"),
+    ).toBe("18–23 November 2026, at Sea Island Golf Club, Georgia");
+  });
+
+  it("omits location when null", () => {
+    expect(
+      formatDatesAndCourse("2026-11-18", "2026-11-23", "Sea Island Golf Club", null),
+    ).toBe("18–23 November 2026, at Sea Island Golf Club");
+  });
+
+  it("says Course not yet known when no course is matched, with location appended", () => {
+    expect(formatDatesAndCourse("2026-11-18", "2026-11-23", null, "Georgia")).toBe(
+      "18–23 November 2026, at a Course not yet known to us, Georgia",
+    );
+  });
+
+  it("says Course not yet known when no course is matched, without location", () => {
+    expect(formatDatesAndCourse("2026-11-18", "2026-11-23", null, null)).toBe(
+      "18–23 November 2026, at a Course not yet known to us",
+    );
   });
 });
 
