@@ -4,6 +4,7 @@ import {
   classifyCoverageEditions,
   courseProfile,
   coverageSentences,
+  daysUntil,
   fitTraits,
   formatDates,
   formatFreshnessDate,
@@ -296,6 +297,28 @@ describe("formatDates", () => {
   it("reads a week in one month, and one across two", () => {
     expect(formatDates("2026-09-24", "2026-09-27")).toBe("24–27 September 2026");
     expect(formatDates("2026-09-30", "2026-10-03")).toBe("30 September – 3 October 2026");
+  });
+});
+
+describe("daysUntil", () => {
+  it("is 0 on the day the Tournament starts, whatever hour `now` carries", () => {
+    expect(daysUntil("2026-11-24", new Date("2026-11-24T23:59:00Z"))).toBe(0);
+  });
+
+  it("is 6 six days before", () => {
+    expect(daysUntil("2026-11-30", new Date("2026-11-24T00:00:00Z"))).toBe(6);
+  });
+
+  it("is 7 seven days before", () => {
+    expect(daysUntil("2026-12-01", new Date("2026-11-24T00:00:00Z"))).toBe(7);
+  });
+
+  it("is 61 over the gap between the regular season and the new year's first event", () => {
+    expect(daysUntil("2027-01-24", new Date("2026-11-24T00:00:00Z"))).toBe(61);
+  });
+
+  it("is negative once the Tournament is already under way", () => {
+    expect(daysUntil("2026-11-19", new Date("2026-11-22T10:00:00Z"))).toBe(-3);
   });
 });
 

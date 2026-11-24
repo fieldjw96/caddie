@@ -426,6 +426,17 @@ export function formatDates(startDate: string, endDate: string): string {
   return `${day(start)}–${day(end)} ${month(end)} ${year(end)}`;
 }
 
+/**
+ * The whole UTC calendar days from `now` until `startDate`: 0 on the day it starts, negative
+ * once the Tournament is already under way. Compares calendar days rather than elapsed time,
+ * so the answer does not depend on what hour `now` happens to carry.
+ */
+export function daysUntil(startDate: string, now: Date): number {
+  const start = new Date(`${startDate}T00:00:00Z`).getTime();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((start - today) / (24 * 60 * 60 * 1000));
+}
+
 /** A list in prose: "A", "A and B", "A, B and C". */
 export function listInWords(items: readonly string[]): string {
   if (items.length <= 1) return items.join("");

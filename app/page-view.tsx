@@ -5,6 +5,7 @@
 import {
   courseProfile,
   coverageSentences,
+  daysUntil,
   fitTraits,
   formatDates,
   formatFreshnessDate,
@@ -15,6 +16,19 @@ import {
 import { ROSTER_WINDOW_MONTHS } from "../lib/roster";
 import { Ranking } from "./ranking";
 import { SECTION_HEADING } from "./styles";
+
+/**
+ * The literal meaning of "this week": a Tournament this close or closer keeps today's copy.
+ * One week out or further, the page says how far off it is instead. See CONTEXT.md's Field:
+ * "a Field is empty rather than assumed for Tournaments further out."
+ */
+const WEEK_AHEAD_DAYS = 7;
+
+/** "9 weeks" or "1 week": `daysAway` rounded to the nearest week, for the band label. */
+function weeksAway(daysAway: number): string {
+  const weeks = Math.round(daysAway / 7);
+  return `${weeks} week${weeks === 1 ? "" : "s"}`;
+}
 
 export const LICENCES = {
   wikipedia: {
@@ -197,6 +211,8 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
   const hasVenue = players.some((p) => p.venueRecord !== null && p.venueRecord.value !== null);
   const courseName = course?.name ?? tournament.courseName;
   const holesTrusted = course?.holesTrusted === true;
+  const daysAway = daysUntil(tournament.startDate, now);
+  const farAway = daysAway >= WEEK_AHEAD_DAYS;
 
   return (
     <main className="break-words">
@@ -206,9 +222,10 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
             <p className="flex items-center gap-3">
               <Wordmark />
               <span className="text-on-band-muted">
-                {skipped.length > 0
+                {(skipped.length > 0
                   ? "The next PGA Tour Tournament we can rank"
-                  : "The next PGA Tour Tournament"}
+                  : "The next PGA Tour Tournament") +
+                  (farAway ? `, in ${weeksAway(daysAway)}` : "")}
               </span>
             </p>
             <p className="text-on-band-muted">
@@ -269,12 +286,25 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
 
       <div className="border-b border-gap-rule bg-gap-panel">
         <p className={`${COLUMN} py-3.5 text-[0.95rem] leading-normal`}>
-          <strong className="mr-2 font-display text-[1.05rem] tracking-[0.06em] text-gap uppercase">
-            The field is assumed, not confirmed.
-          </strong>
-          No open source publishes entry lists, so this ranks Players with a stored result in
-          the last {ROSTER_WINDOW_MONTHS} months, {players.length} Players, rather than the
-          Players actually entered this week.
+          {farAway ? (
+            <>
+              <strong className="mr-2 font-display text-[1.05rem] tracking-[0.06em] text-gap uppercase">
+                No Field exists yet for this Tournament.
+              </strong>
+              A Field is known only shortly before play, so this ranks Players with a stored
+              result in the last {ROSTER_WINDOW_MONTHS} months, {players.length} Players.
+              {skipped.length === 0 && " No PGA Tour Tournament is played before this one."}
+            </>
+          ) : (
+            <>
+              <strong className="mr-2 font-display text-[1.05rem] tracking-[0.06em] text-gap uppercase">
+                The field is assumed, not confirmed.
+              </strong>
+              No open source publishes entry lists, so this ranks Players with a stored result
+              in the last {ROSTER_WINDOW_MONTHS} months, {players.length} Players, rather than
+              the Players actually entered this week.
+            </>
+          )}
         </p>
       </div>
 
@@ -365,7 +395,7 @@ export function PageView({ data, now = new Date() }: { data: PageData | null; no
               The Weightings are declared, not fitted: there are too few openly published
               results to tell what a Course rewards from who happened to play it. A Fit Score
               is an opinion with its arithmetic on display, and says nothing about where anyone
-              finishes this week.
+              finishes{farAway ? "." : " this week."}
             </li>
           </ul>
         </section>
