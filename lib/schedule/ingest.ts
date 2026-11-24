@@ -111,12 +111,27 @@ export async function resolveCourseFacts(
  * failed leaves the stored facts as they were, because a request that did not arrive says
  * nothing about whether what an earlier run read still holds. An article that was read and
  * states nothing does clear them, because that is a fact about the article.
+ *
+ * This is also the one place that can tell a venue has changed, because it is the only one
+ * that sees the Course name a stored link was made against. So where it writes a
+ * `course_name` different from the stored one, it clears `course_id` and `course_match` in the
+ * same statement: the link points at the old venue and nothing here can say what the new one
+ * is. `ingest:courses` matches the new name on its next run. Where the name it stores is the
+ * name already there — including the branch above that keeps the stored name when this run read
+ * no article — the link is left alone, which is the rule lib/opengolfapi/store.ts now keeps too.
  */
 export async function upsertTournaments(
   database: Database,
   records: readonly TournamentRecord[],
 ): Promise<void> {
   if (records.length === 0) return;
+  // The `course_name` this statement will leave stored, written once and reused, so the test
+  // for "the venue changed" cannot drift from the value whose change it is testing for.
+  const nextCourseName = sql`case when excluded.course_article_url is null
+          then ${tournaments.courseName} else excluded.course_name end`;
+  // `is distinct from`, not `<>`: a venue going from a name to none, or from none to a name, is
+  // a change like any other, and `<>` would call both of those unknown and keep the link.
+  const venueChanged = sql`(${nextCourseName}) is distinct from ${tournaments.courseName}`;
   await database
     .insert(tournaments)
     .values([...records])
@@ -125,14 +140,17 @@ export async function upsertTournaments(
       set: {
         startDate: sql`excluded.start_date`,
         endDate: sql`excluded.end_date`,
-        courseName: sql`case when excluded.course_article_url is null
-          then ${tournaments.courseName} else excluded.course_name end`,
+        courseName: nextCourseName,
         coursePar: sql`case when excluded.course_article_url is null
           then ${tournaments.coursePar} else excluded.course_par end`,
         courseYardage: sql`case when excluded.course_article_url is null
           then ${tournaments.courseYardage} else excluded.course_yardage end`,
         courseArticleUrl: sql`case when excluded.course_article_url is null
           then ${tournaments.courseArticleUrl} else excluded.course_article_url end`,
+        // Both or neither, in one statement, so `tournaments_course_match_is_recorded` holds.
+        courseId: sql`case when ${venueChanged} then null else ${tournaments.courseId} end`,
+        courseMatch: sql`case when ${venueChanged}
+          then null else ${tournaments.courseMatch} end`,
         location: sql`excluded.location`,
         sourceUrl: sql`excluded.source_url`,
         recordedAt: sql`now()`,
